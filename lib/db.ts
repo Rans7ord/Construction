@@ -1,7 +1,7 @@
 import mysql from 'mysql2/promise';
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'server123.hostingprovider.com',
+  host: process.env.DB_HOST || 'madgecrystals.com',
   user: process.env.DB_USER || 'tertrac2_dbuser',
   password: process.env.DB_PASS || '1Longp@ssword',
   database: process.env.DB_NAME || 'tertrac2_constructionManager',
