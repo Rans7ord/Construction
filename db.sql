@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   role ENUM('admin', 'supervisor', 'staff') NOT NULL DEFAULT 'staff',
   company_id VARCHAR(50) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_company_id (company_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -28,8 +29,8 @@ CREATE TABLE IF NOT EXISTS projects (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   status ENUM('active', 'completed', 'paused') DEFAULT 'active',
   company_id VARCHAR(50) NOT NULL,
-  FOREIGN KEY (created_by) REFERENCES users(id),
-  FOREIGN KEY (company_id) REFERENCES users(company_id)
+  FOREIGN KEY (created_by) REFERENCES users(id)
+  -- Removed the foreign key constraint on company_id since it's not a unique column
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS project_steps (
