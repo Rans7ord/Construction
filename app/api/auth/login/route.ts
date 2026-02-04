@@ -64,8 +64,7 @@ export async function POST(request: NextRequest) {
           role: user.role,
           companyId: user.company_id,
         },
-      },
-      { status: 200 }
+      }
     );
 
     response.cookies.set('authToken', token, {
