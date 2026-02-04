@@ -1,72 +1,90 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, getStoredState, saveState } from './store';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  companyId: string;
+}
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => void;
-  logout: () => void;
+  user: AuthUser | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   isLoading: boolean;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initialize from localStorage
-    const state = getStoredState();
-    setUser(state.currentUser);
-    setIsLoading(false);
-  }, []);
-
-  const login = (email: string, password: string) => {
-    // Demo users for testing
-    const demoUsers: Record<string, User> = {
-      'admin@buildmanager.com': {
-        id: 'user1',
-        name: 'John Admin',
-        email: 'admin@buildmanager.com',
-        role: 'admin',
-        companyId: 'company1',
-      },
-      'supervisor@buildmanager.com': {
-        id: 'user2',
-        name: 'Jane Supervisor',
-        email: 'supervisor@buildmanager.com',
-        role: 'supervisor',
-        companyId: 'company1',
-      },
-      'staff@buildmanager.com': {
-        id: 'user3',
-        name: 'Bob Staff',
-        email: 'staff@buildmanager.com',
-        role: 'staff',
-        companyId: 'company1',
-      },
+    // Check if user is already authenticated
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.error('[v0] Auth check error:', err);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    const foundUser = demoUsers[email];
-    if (foundUser && password === 'password') {
-      setUser(foundUser);
-      const state = getStoredState();
-      state.currentUser = foundUser;
-      saveState(state);
+    checkAuth();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Login failed');
+        throw new Error(data.error || 'Login failed');
+      }
+
+      setUser(data.user);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    const state = getStoredState();
-    state.currentUser = null;
-    saveState(state);
+  const logout = async () => {
+    setError(null);
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      setUser(null);
+    } catch (err) {
+      console.error('[v0] Logout error:', err);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading, error }}>
       {children}
     </AuthContext.Provider>
   );
