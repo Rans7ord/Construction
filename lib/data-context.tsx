@@ -48,11 +48,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/projects', {
         credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to fetch projects');
+      if (response.status === 401) {
+        console.log('[v0] Not authenticated, skipping projects fetch');
+        setState((prev) => ({ ...prev, projects: [] }));
+        return;
+      }
+      if (!response.ok) {
+        console.error('[v0] Fetch projects error:', response.status, response.statusText);
+        setState((prev) => ({ ...prev, projects: [] }));
+        return;
+      }
       const projects = await response.json();
       setState((prev) => ({ ...prev, projects: projects || [] }));
     } catch (error) {
       console.error('[v0] Fetch projects error:', error);
+      setState((prev) => ({ ...prev, projects: [] }));
     } finally {
       setIsLoading(false);
     }
@@ -65,20 +75,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/users', {
         credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to fetch users');
+      if (response.status === 401) {
+        console.log('[v0] Not authenticated, skipping users fetch');
+        setState((prev) => ({ ...prev, users: [] }));
+        return;
+      }
+      if (!response.ok) {
+        console.error('[v0] Fetch users error:', response.status, response.statusText);
+        setState((prev) => ({ ...prev, users: [] }));
+        return;
+      }
       const users = await response.json();
       setState((prev) => ({ ...prev, users: users || [] }));
     } catch (error) {
       console.error('[v0] Fetch users error:', error);
+      setState((prev) => ({ ...prev, users: [] }));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Initial data load
+  // Initial data load only if user is authenticated
   useEffect(() => {
-    fetchProjects();
-    fetchUsers();
+    const checkAuthAndFetch = async () => {
+      try {
+        const authResponse = await fetch('/api/auth/me', {
+          credentials: 'include',
+        });
+        if (authResponse.ok) {
+          fetchProjects();
+          fetchUsers();
+        }
+      } catch (error) {
+        console.error('[v0] Auth check error:', error);
+      }
+    };
+    
+    checkAuthAndFetch();
   }, []);
 
   const saveAndUpdate = (newState: AppState) => {
