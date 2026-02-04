@@ -10,7 +10,6 @@ import {
   Users,
   Menu,
   X,
-  Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -32,12 +31,6 @@ const menuItems = [
     href: '/dashboard/reports',
     icon: BarChart3,
     roles: ['admin', 'supervisor', 'staff'],
-  },
-  {
-    label: 'Petty Cash',
-    href: '/dashboard/petty-cash',
-    icon: Wallet,
-    roles: ['admin', 'supervisor'],
   },
   {
     label: 'User Management',

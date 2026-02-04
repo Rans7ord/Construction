@@ -14,318 +14,171 @@ import {
 
 interface DataContextType {
   state: AppState;
-  isLoading: boolean;
-  createProject: (project: Omit<Project, 'id' | 'createdAt'>) => Promise<void>;
-  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
-  deleteProject: (id: string) => Promise<void>;
-  createStep: (step: Omit<ProjectStep, 'id'>) => Promise<void>;
-  updateStep: (id: string, updates: Partial<ProjectStep>) => Promise<void>;
-  deleteStep: (id: string) => Promise<void>;
-  addMoneyIn: (money: Omit<MoneyIn, 'id'>) => Promise<void>;
-  updateMoneyIn: (id: string, updates: Partial<MoneyIn>) => Promise<void>;
-  deleteMoneyIn: (id: string) => Promise<void>;
-  addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
-  updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
-  deleteExpense: (id: string) => Promise<void>;
-  createUser: (user: Omit<User, 'id' | 'companyId'>) => Promise<void>;
-  updateUser: (id: string, updates: Partial<User>) => Promise<void>;
-  deleteUser: (id: string) => Promise<void>;
+  createProject: (project: Omit<Project, 'id' | 'createdAt'>) => void;
+  updateProject: (id: string, updates: Partial<Project>) => void;
+  deleteProject: (id: string) => void;
+  createStep: (step: Omit<ProjectStep, 'id'>) => void;
+  updateStep: (id: string, updates: Partial<ProjectStep>) => void;
+  deleteStep: (id: string) => void;
+  addMoneyIn: (money: Omit<MoneyIn, 'id'>) => void;
+  updateMoneyIn: (id: string, updates: Partial<MoneyIn>) => void;
+  deleteMoneyIn: (id: string) => void;
+  addExpense: (expense: Omit<Expense, 'id'>) => void;
+  updateExpense: (id: string, updates: Partial<Expense>) => void;
+  deleteExpense: (id: string) => void;
+  createUser: (user: Omit<User, 'id' | 'companyId'>) => void;
+  updateUser: (id: string, updates: Partial<User>) => void;
+  deleteUser: (id: string) => void;
   exportProjectToExcel: (projectId: string) => void;
-  fetchProjects: () => Promise<void>;
-  fetchUsers: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(getStoredState());
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Fetch projects from database
-  const fetchProjects = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/projects', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      
-      if (!response.ok) {
-        setState((prev) => ({ ...prev, projects: [] }));
-        return;
-      }
-      const projects = await response.json();
-      setState((prev) => ({ ...prev, projects: projects || [] }));
-    } catch (error) {
-      setState((prev) => ({ ...prev, projects: [] }));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch users from database
-  const fetchUsers = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/users', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      
-      if (!response.ok) {
-        setState((prev) => ({ ...prev, users: [] }));
-        return;
-      }
-      const users = await response.json();
-      setState((prev) => ({ ...prev, users: users || [] }));
-    } catch (error) {
-      setState((prev) => ({ ...prev, users: [] }));
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   const saveAndUpdate = (newState: AppState) => {
     setState(newState);
     saveState(newState);
   };
 
-  const createProject = async (project: Omit<Project, 'id' | 'createdAt'>) => {
-    try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(project),
-      });
-      if (!response.ok) throw new Error('Failed to create project');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Create project error:', error);
-      throw error;
-    }
+  const createProject = (project: Omit<Project, 'id' | 'createdAt'>) => {
+    const newProject: Project = {
+      ...project,
+      id: `proj_${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    saveAndUpdate({
+      ...state,
+      projects: [...state.projects, newProject],
+    });
   };
 
-  const updateProject = async (id: string, updates: Partial<Project>) => {
-    try {
-      const response = await fetch(`/api/projects/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) throw new Error('Failed to update project');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Update project error:', error);
-      throw error;
-    }
+  const updateProject = (id: string, updates: Partial<Project>) => {
+    saveAndUpdate({
+      ...state,
+      projects: state.projects.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+    });
   };
 
-  const deleteProject = async (id: string) => {
+  const deleteProject = (id: string) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch(`/api/projects/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to delete project');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Delete project error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      projects: state.projects.filter((p) => p.id !== id),
+      steps: state.steps.filter((s) => s.projectId !== id),
+      moneyIn: state.moneyIn.filter((m) => m.projectId !== id),
+      expenses: state.expenses.filter((e) => e.projectId !== id),
+    });
   };
 
-  const createStep = async (step: Omit<ProjectStep, 'id'>) => {
-    try {
-      const response = await fetch('/api/project-steps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(step),
-      });
-      if (!response.ok) throw new Error('Failed to create step');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Create step error:', error);
-      throw error;
-    }
+  const createStep = (step: Omit<ProjectStep, 'id'>) => {
+    const newStep: ProjectStep = {
+      ...step,
+      id: `step_${Date.now()}`,
+    };
+    saveAndUpdate({
+      ...state,
+      steps: [...state.steps, newStep],
+    });
   };
 
-  const updateStep = async (id: string, updates: Partial<ProjectStep>) => {
-    try {
-      const response = await fetch(`/api/project-steps/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) throw new Error('Failed to update step');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Update step error:', error);
-      throw error;
-    }
+  const updateStep = (id: string, updates: Partial<ProjectStep>) => {
+    saveAndUpdate({
+      ...state,
+      steps: state.steps.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+    });
   };
 
-  const deleteStep = async (id: string) => {
+  const deleteStep = (id: string) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch(`/api/project-steps/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to delete step');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Delete step error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      steps: state.steps.filter((s) => s.id !== id),
+      expenses: state.expenses.filter((e) => e.stepId !== id),
+    });
   };
 
-  const addMoneyIn = async (money: Omit<MoneyIn, 'id'>) => {
-    try {
-      const response = await fetch('/api/money-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(money),
-      });
-      if (!response.ok) throw new Error('Failed to add money in');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Add money in error:', error);
-      throw error;
-    }
+  const addMoneyIn = (money: Omit<MoneyIn, 'id'>) => {
+    const newMoneyIn: MoneyIn = {
+      ...money,
+      id: `money_${Date.now()}`,
+    };
+    saveAndUpdate({
+      ...state,
+      moneyIn: [...state.moneyIn, newMoneyIn],
+    });
   };
 
-  const updateMoneyIn = async (id: string, updates: Partial<MoneyIn>) => {
-    try {
-      const response = await fetch(`/api/money-in/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) throw new Error('Failed to update money in');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Update money in error:', error);
-      throw error;
-    }
+  const updateMoneyIn = (id: string, updates: Partial<MoneyIn>) => {
+    saveAndUpdate({
+      ...state,
+      moneyIn: state.moneyIn.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+    });
   };
 
-  const deleteMoneyIn = async (id: string) => {
+  const deleteMoneyIn = (id: string) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch(`/api/money-in/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to delete money in');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Delete money in error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      moneyIn: state.moneyIn.filter((m) => m.id !== id),
+    });
   };
 
-  const addExpense = async (expense: Omit<Expense, 'id'>) => {
-    try {
-      const response = await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(expense),
-      });
-      if (!response.ok) throw new Error('Failed to add expense');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Add expense error:', error);
-      throw error;
-    }
+  const addExpense = (expense: Omit<Expense, 'id'>) => {
+    const newExpense: Expense = {
+      ...expense,
+      id: `exp_${Date.now()}`,
+    };
+    saveAndUpdate({
+      ...state,
+      expenses: [...state.expenses, newExpense],
+    });
   };
 
-  const updateExpense = async (id: string, updates: Partial<Expense>) => {
+  const updateExpense = (id: string, updates: Partial<Expense>) => {
     if (state.currentUser?.role === 'supervisor') return;
-    try {
-      const response = await fetch(`/api/expenses/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates),
-      });
-      if (!response.ok) throw new Error('Failed to update expense');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Update expense error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      expenses: state.expenses.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+    });
   };
 
-  const deleteExpense = async (id: string) => {
+  const deleteExpense = (id: string) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch(`/api/expenses/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to delete expense');
-      await fetchProjects();
-    } catch (error) {
-      console.error('[v0] Delete expense error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      expenses: state.expenses.filter((e) => e.id !== id),
+    });
   };
 
-  const createUser = async (user: Omit<User, 'id' | 'companyId'>) => {
+  const createUser = (user: Omit<User, 'id' | 'companyId'>) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(user),
-      });
-      if (!response.ok) throw new Error('Failed to create user');
-      await fetchUsers();
-    } catch (error) {
-      console.error('[v0] Create user error:', error);
-      throw error;
-    }
+    const newUser: User = {
+      ...user,
+      id: `user_${Date.now()}`,
+      companyId: state.currentUser.companyId,
+    };
+    saveAndUpdate({
+      ...state,
+      users: [...state.users, newUser],
+    });
   };
 
-  const updateUser = async (id: string, updates: Partial<User>) => {
+  const updateUser = (id: string, updates: Partial<User>) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch('/api/users', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userId: id, ...updates }),
-      });
-      if (!response.ok) throw new Error('Failed to update user');
-      await fetchUsers();
-    } catch (error) {
-      console.error('[v0] Update user error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      users: state.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
+    });
   };
 
-  const deleteUser = async (id: string) => {
+  const deleteUser = (id: string) => {
     if (state.currentUser?.role !== 'admin' || id === state.currentUser.id) return;
-    try {
-      const response = await fetch(`/api/users?userId=${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to delete user');
-      await fetchUsers();
-    } catch (error) {
-      console.error('[v0] Delete user error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      users: state.users.filter((u) => u.id !== id),
+    });
   };
 
   const exportProjectToExcel = (projectId: string) => {
@@ -398,7 +251,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider
       value={{
         state,
-        isLoading,
         createProject,
         updateProject,
         deleteProject,
@@ -415,8 +267,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateUser,
         deleteUser,
         exportProjectToExcel,
-        fetchProjects,
-        fetchUsers,
       }}
     >
       {children}
