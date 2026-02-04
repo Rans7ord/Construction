@@ -45,23 +45,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
+      console.log('[v0] Fetching projects...');
       const response = await fetch('/api/projects', {
         credentials: 'include',
       });
+      console.log('[v0] Projects response status:', response.status);
+      
       if (response.status === 401) {
         console.log('[v0] Not authenticated, skipping projects fetch');
         setState((prev) => ({ ...prev, projects: [] }));
         return;
       }
       if (!response.ok) {
-        console.error('[v0] Fetch projects error:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[v0] Fetch projects error:', response.status, response.statusText, errorData);
         setState((prev) => ({ ...prev, projects: [] }));
         return;
       }
       const projects = await response.json();
+      console.log('[v0] Projects fetched:', projects?.length || 0);
       setState((prev) => ({ ...prev, projects: projects || [] }));
     } catch (error) {
-      console.error('[v0] Fetch projects error:', error);
+      console.error('[v0] Fetch projects exception:', error);
       setState((prev) => ({ ...prev, projects: [] }));
     } finally {
       setIsLoading(false);
@@ -72,23 +77,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
+      console.log('[v0] Fetching users...');
       const response = await fetch('/api/users', {
         credentials: 'include',
       });
+      console.log('[v0] Users response status:', response.status);
+      
       if (response.status === 401) {
         console.log('[v0] Not authenticated, skipping users fetch');
         setState((prev) => ({ ...prev, users: [] }));
         return;
       }
       if (!response.ok) {
-        console.error('[v0] Fetch users error:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[v0] Fetch users error:', response.status, response.statusText, errorData);
         setState((prev) => ({ ...prev, users: [] }));
         return;
       }
       const users = await response.json();
+      console.log('[v0] Users fetched:', users?.length || 0);
       setState((prev) => ({ ...prev, users: users || [] }));
     } catch (error) {
-      console.error('[v0] Fetch users error:', error);
+      console.error('[v0] Fetch users exception:', error);
       setState((prev) => ({ ...prev, users: [] }));
     } finally {
       setIsLoading(false);
@@ -99,12 +109,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkAuthAndFetch = async () => {
       try {
+        console.log('[v0] Checking authentication...');
         const authResponse = await fetch('/api/auth/me', {
           credentials: 'include',
         });
+        console.log('[v0] Auth response status:', authResponse.status);
         if (authResponse.ok) {
+          console.log('[v0] User authenticated, fetching data...');
           fetchProjects();
           fetchUsers();
+        } else {
+          console.log('[v0] User not authenticated');
         }
       } catch (error) {
         console.error('[v0] Auth check error:', error);
