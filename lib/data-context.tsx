@@ -31,6 +31,7 @@ interface DataContextType {
   updateUser: (id: string, updates: Partial<User>) => void;
   deleteUser: (id: string) => void;
   exportProjectToExcel: (projectId: string) => void;
+  fetchSteps: (projectId?: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -38,6 +39,22 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [state, setState] = useState<AppState>(getStoredState());
+
+  // Helper function to fetch steps
+  const fetchSteps = async (projectId?: string) => {
+    try {
+      const url = projectId 
+        ? `/api/steps?projectId=${projectId}` 
+        : '/api/steps';
+      const response = await fetch(url);
+      if (response.ok) {
+        const steps = await response.json();
+        setState(prev => ({ ...prev, steps }));
+      }
+    } catch (error) {
+      console.error('Fetch steps error:', error);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -175,6 +192,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ...prev,
           steps: [...prev.steps, newStep],
         }));
+        
+        // Force a refetch to ensure data is fresh
+        await fetchSteps(step.projectId);
       } else {
         throw new Error('Failed to create step');
       }
@@ -200,6 +220,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ...prev,
           steps: prev.steps.map((s) => (s.id === id ? updatedStep : s)),
         }));
+        
+        // If projectId is in updates, refetch steps for that project
+        if (updates.projectId) {
+          await fetchSteps(updates.projectId);
+        }
       } else {
         throw new Error('Failed to update step');
       }
@@ -218,11 +243,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
 
       if (response.ok) {
+        // Get the projectId before deleting to know which steps to refetch
+        const stepToDelete = state.steps.find((s) => s.id === id);
+        const projectId = stepToDelete?.projectId;
+        
         setState(prev => ({
           ...prev,
           steps: prev.steps.filter((s) => s.id !== id),
           expenses: prev.expenses.filter((e) => e.stepId !== id),
         }));
+        
+        // Refetch steps for the project
+        if (projectId) {
+          await fetchSteps(projectId);
+        }
       } else {
         throw new Error('Failed to delete step');
       }
@@ -493,6 +527,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateUser,
         deleteUser,
         exportProjectToExcel,
+        fetchSteps, // Make fetchSteps available to components
       }}
     >
       {children}

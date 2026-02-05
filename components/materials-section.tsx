@@ -50,8 +50,12 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
       if (stepId) params.append('stepId', stepId);
 
       const response = await fetch(`/api/materials?${params}`);
-      const data = await response.json();
-      setMaterials(data || []);
+      if (response.ok) {
+        const data = await response.json();
+        setMaterials(data || []);
+      } else {
+        console.error('[v0] Failed to fetch materials');
+      }
     } catch (error) {
       console.error('[v0] Fetch materials error:', error);
     }
@@ -59,6 +63,20 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
 
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.name || !formData.type || !formData.quantity) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    // Validate quantity
+    const quantity = parseFloat(formData.quantity);
+    if (isNaN(quantity) || quantity <= 0) {
+      alert('Please enter a valid quantity greater than 0');
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -67,19 +85,33 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          stepId: stepId || projectId,
-          ...formData,
-          quantity: parseFloat(formData.quantity),
+          stepId: stepId || projectId, // Fallback to projectId if no stepId
+          name: formData.name,
+          type: formData.type,
+          quantity: quantity,
+          unit: formData.unit,
+          description: formData.description,
         }),
       });
 
-      if (response.ok) {
-        setFormData({ name: '', type: '', quantity: '', unit: 'pcs', description: '' });
-        setIsOpen(false);
-        fetchMaterials();
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add material');
       }
+
+      // Success - clear form and close dialog
+      setFormData({ name: '', type: '', quantity: '', unit: 'pcs', description: '' });
+      setIsOpen(false);
+      
+      // Refetch materials
+      await fetchMaterials();
+      
+      // Show success message
+      alert('Material added successfully');
     } catch (error) {
       console.error('[v0] Add material error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to add material. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -88,10 +120,20 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this material?')) {
       try {
-        await fetch(`/api/materials/${id}`, { method: 'DELETE' });
-        fetchMaterials();
+        const response = await fetch(`/api/materials/${id}`, { 
+          method: 'DELETE' 
+        });
+        
+        if (response.ok) {
+          await fetchMaterials();
+          alert('Material deleted successfully');
+        } else {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to delete material');
+        }
       } catch (error) {
         console.error('[v0] Delete material error:', error);
+        alert(error instanceof Error ? error.message : 'Failed to delete material');
       }
     }
   };
@@ -114,7 +156,7 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
               </DialogHeader>
               <form onSubmit={handleAddMaterial} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Material Name</label>
+                  <label className="block text-sm font-medium mb-2">Material Name *</label>
                   <input
                     type="text"
                     value={formData.name}
@@ -122,11 +164,12 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
                     className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                     placeholder="e.g., Cement, Steel Rebar"
                     required
+                    disabled={isLoading}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Type</label>
+                  <label className="block text-sm font-medium mb-2">Type *</label>
                   <input
                     type="text"
                     value={formData.type}
@@ -134,20 +177,23 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
                     className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                     placeholder="e.g., Concrete, Metal"
                     required
+                    disabled={isLoading}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Quantity</label>
+                    <label className="block text-sm font-medium mb-2">Quantity *</label>
                     <input
                       type="number"
                       step="0.01"
+                      min="0.01"
                       value={formData.quantity}
                       onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="0.00"
                       required
+                      disabled={isLoading}
                     />
                   </div>
 
@@ -157,15 +203,18 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
                       value={formData.unit}
                       onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                       className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      disabled={isLoading}
                     >
-                      <option>pcs</option>
-                      <option>kg</option>
-                      <option>ton</option>
-                      <option>m</option>
-                      <option>m2</option>
-                      <option>m3</option>
-                      <option>liters</option>
-                      <option>bags</option>
+                      <option value="pcs">pcs</option>
+                      <option value="kg">kg</option>
+                      <option value="ton">ton</option>
+                      <option value="m">m</option>
+                      <option value="m2">m²</option>
+                      <option value="m3">m³</option>
+                      <option value="liters">liters</option>
+                      <option value="bags">bags</option>
+                      <option value="sheets">sheets</option>
+                      <option value="rolls">rolls</option>
                     </select>
                   </div>
                 </div>
@@ -178,12 +227,28 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
                     className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                     placeholder="Optional details about the material"
                     rows={2}
+                    disabled={isLoading}
                   />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Adding...' : 'Add Material'}
-                </Button>
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsOpen(false)}
+                    className="flex-1"
+                    disabled={isLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="flex-1" 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Adding...' : 'Add Material'}
+                  </Button>
+                </div>
               </form>
             </DialogContent>
           </Dialog>
@@ -207,6 +272,7 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
                   <button
                     onClick={() => handleDelete(material.id)}
                     className="p-1 text-destructive hover:bg-destructive/10 rounded transition"
+                    disabled={isLoading}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

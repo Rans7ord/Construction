@@ -104,6 +104,19 @@ export default function PettyCashPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate all required fields
+    if (!formData.amount || !formData.description || !formData.type || !formData.date) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Amount must be a number greater than 0');
+      return;
+    }
+    
     setSubmitting(true);
 
     try {
@@ -113,75 +126,124 @@ export default function PettyCashPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
-          amount: parseFloat(formData.amount),
+          amount: amount,
+          description: formData.description.trim(),
+          category: formData.category.trim() || null,
+          vendor: formData.vendor.trim() || null,
+          type: formData.type,
+          date: formData.date,
         }),
       });
 
-      if (response.ok) {
-        toast.success('Transaction added successfully');
-        setFormData({
-          amount: '',
-          description: '',
-          category: '',
-          vendor: '',
-          type: 'outflow',
-          date: new Date().toISOString().split('T')[0],
-        });
-        fetchPettyCash();
-      } else {
+      if (!response.ok) {
         const error = await response.json();
-        toast.error(error.error || 'Failed to add transaction');
+        throw new Error(error.error || 'Failed to add transaction');
       }
+
+      const result = await response.json();
+      
+      toast.success('Transaction added successfully');
+      
+      // Reset form
+      setFormData({
+        amount: '',
+        description: '',
+        category: '',
+        vendor: '',
+        type: 'outflow',
+        date: new Date().toISOString().split('T')[0],
+      });
+      
+      // Refresh data
+      await fetchPettyCash();
+      
     } catch (error) {
       console.error('Error adding transaction:', error);
-      toast.error('Error adding transaction');
+      toast.error(error instanceof Error ? error.message : 'Error adding transaction. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const exportToCSV = () => {
-    const headers = ['Date', 'Type', 'Description', 'Category', 'Vendor', 'Amount', 'Added By'];
-    const csvContent = [
-      headers.join(','),
-      ...data.transactions.map(t => [
-        t.date,
-        t.type,
-        `"${t.description}"`,
-        t.category || '',
-        t.vendor || '',
-        t.amount,
-        `"${t.added_by_name}"`,
-      ].join(','))
-    ].join('\n');
+    if (data.transactions.length === 0) {
+      toast.error('No transactions to export');
+      return;
+    }
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `petty-cash-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    try {
+      const headers = ['Date', 'Type', 'Description', 'Category', 'Vendor', 'Amount', 'Added By'];
+      const csvContent = [
+        headers.join(','),
+        ...data.transactions.map(t => [
+          t.date,
+          t.type,
+          `"${t.description.replace(/"/g, '""')}"`,
+          t.category ? `"${t.category.replace(/"/g, '""')}"` : '',
+          t.vendor ? `"${t.vendor.replace(/"/g, '""')}"` : '',
+          t.amount.toFixed(2),
+          `"${t.added_by_name.replace(/"/g, '""')}"`,
+        ].join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `petty-cash-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('CSV exported successfully');
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast.error('Failed to export CSV');
+    }
   };
 
   const exportToPDF = () => {
-    // Simple text-based PDF export for now
-    const content = `Petty Cash Report - ${new Date().toLocaleDateString()}\n\n`;
-    const summary = `Balance: $${data.balance.toFixed(2)}\nInflows: $${data.inflows.toFixed(2)}\nOutflows: $${data.outflows.toFixed(2)}\n\n`;
-    const transactions = data.transactions.map(t =>
-      `${t.date} - ${t.type.toUpperCase()} - ${t.description} - $${t.amount.toFixed(2)} - ${t.added_by_name}`
-    ).join('\n');
+    if (data.transactions.length === 0) {
+      toast.error('No transactions to export');
+      return;
+    }
 
-    const fullContent = content + summary + 'Transactions:\n' + transactions;
+    try {
+      // Simple text-based PDF export for now
+      const content = `Petty Cash Report - ${new Date().toLocaleDateString()}\n\n`;
+      const summary = `Balance: $${data.balance.toFixed(2)}\nInflows: $${data.inflows.toFixed(2)}\nOutflows: $${data.outflows.toFixed(2)}\n\n`;
+      const transactions = data.transactions.map(t =>
+        `${t.date} - ${t.type.toUpperCase()} - ${t.description} - $${t.amount.toFixed(2)} - ${t.added_by_name}`
+      ).join('\n');
 
-    const blob = new Blob([fullContent], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `petty-cash-report-${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+      const fullContent = content + summary + 'Transactions:\n' + transactions;
+
+      const blob = new Blob([fullContent], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `petty-cash-report-${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Report exported successfully');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export report');
+    }
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      startDate: '',
+      endDate: '',
+      category: '',
+      vendor: '',
+      type: '',
+    });
   };
 
   if (loading) {
@@ -215,13 +277,13 @@ export default function PettyCashPage() {
               <p className="text-muted-foreground mt-2">Track inflows, outflows, and maintain petty cash balance</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={exportToCSV} className="gap-2">
+              <Button variant="outline" onClick={exportToCSV} className="gap-2" disabled={data.transactions.length === 0}>
                 <Download className="w-4 h-4" />
                 Export CSV
               </Button>
-              <Button variant="outline" onClick={exportToPDF} className="gap-2">
+              <Button variant="outline" onClick={exportToPDF} className="gap-2" disabled={data.transactions.length === 0}>
                 <Download className="w-4 h-4" />
-                Export PDF
+                Export Report
               </Button>
             </div>
           </div>
@@ -272,9 +334,14 @@ export default function PettyCashPage() {
               Add Transaction
             </h3>
             <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <Label htmlFor="type">Type</Label>
-                <Select value={formData.type} onValueChange={(value: 'inflow' | 'outflow') => setFormData({...formData, type: value})}>
+              <div className="space-y-2">
+                <Label htmlFor="type">Type *</Label>
+                <Select 
+                  value={formData.type} 
+                  onValueChange={(value: 'inflow' | 'outflow') => setFormData({...formData, type: value})}
+                  required
+                  disabled={submitting}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -285,56 +352,66 @@ export default function PettyCashPage() {
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="amount">Amount</Label>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount *</Label>
                 <Input
                   id="amount"
                   type="number"
                   step="0.01"
+                  min="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                  placeholder="0.00"
                   required
+                  disabled={submitting}
                 />
               </div>
 
-              <div>
-                <Label htmlFor="date">Date</Label>
+              <div className="space-y-2">
+                <Label htmlFor="date">Date *</Label>
                 <Input
                   id="date"
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({...formData, date: e.target.value})}
                   required
+                  max={new Date().toISOString().split('T')[0]}
+                  disabled={submitting}
                 />
               </div>
 
-              <div className="md:col-span-2 lg:col-span-3">
-                <Label htmlFor="description">Description</Label>
+              <div className="md:col-span-2 lg:col-span-3 space-y-2">
+                <Label htmlFor="description">Description *</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Enter transaction description"
                   required
+                  disabled={submitting}
+                  rows={2}
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Input
                   id="category"
                   value={formData.category}
                   onChange={(e) => setFormData({...formData, category: e.target.value})}
                   placeholder="e.g., Office Supplies"
+                  disabled={submitting}
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="vendor">Vendor</Label>
                 <Input
                   id="vendor"
                   value={formData.vendor}
                   onChange={(e) => setFormData({...formData, vendor: e.target.value})}
                   placeholder="e.g., Office Depot"
+                  disabled={submitting}
                 />
               </div>
 
@@ -344,13 +421,19 @@ export default function PettyCashPage() {
                 </Button>
               </div>
             </form>
+            <p className="text-xs text-muted-foreground mt-4">* Required fields</p>
           </Card>
 
           {/* Filters */}
           <Card className="p-6 mb-8 border-border/50">
-            <h3 className="text-lg font-semibold mb-6">Filters</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold">Filters</h3>
+              <Button variant="outline" size="sm" onClick={clearFilters} disabled={!filters.startDate && !filters.endDate && !filters.category && !filters.vendor && !filters.type}>
+                Clear Filters
+              </Button>
+            </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="startDate">Start Date</Label>
                 <Input
                   id="startDate"
@@ -360,17 +443,18 @@ export default function PettyCashPage() {
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="endDate">End Date</Label>
                 <Input
                   id="endDate"
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                  min={filters.startDate}
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="filterCategory">Category</Label>
                 <Input
                   id="filterCategory"
@@ -380,7 +464,7 @@ export default function PettyCashPage() {
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="filterVendor">Vendor</Label>
                 <Input
                   id="filterVendor"
@@ -390,14 +474,14 @@ export default function PettyCashPage() {
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="filterType">Type</Label>
                 <Select value={filters.type} onValueChange={(value) => setFilters({...filters, type: value})}>
                   <SelectTrigger>
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="">All Types</SelectItem>
                     <SelectItem value="inflow">Inflow</SelectItem>
                     <SelectItem value="outflow">Outflow</SelectItem>
                   </SelectContent>
@@ -410,7 +494,16 @@ export default function PettyCashPage() {
           <Card className="p-6 border-border/50">
             <h3 className="text-lg font-semibold mb-6">Transaction History</h3>
             {data.transactions.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No transactions found</p>
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">No transactions found</p>
+                {filters.startDate || filters.endDate || filters.category || filters.vendor || filters.type ? (
+                  <Button variant="outline" onClick={clearFilters}>
+                    Clear filters to see all transactions
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Add your first transaction using the form above</p>
+                )}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -427,24 +520,30 @@ export default function PettyCashPage() {
                   </TableHeader>
                   <TableBody>
                     {data.transactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
+                      <TableRow key={transaction.id} className="hover:bg-muted/50">
+                        <TableCell>
+                          {new Date(transaction.date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             transaction.type === 'inflow'
                               ? 'bg-green-100 text-green-800'
                               : 'bg-orange-100 text-orange-800'
                           }`}>
-                            {transaction.type}
+                            {transaction.type === 'inflow' ? 'Inflow' : 'Outflow'}
                           </span>
                         </TableCell>
-                        <TableCell>{transaction.description}</TableCell>
+                        <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
                         <TableCell>{transaction.category || '-'}</TableCell>
                         <TableCell>{transaction.vendor || '-'}</TableCell>
                         <TableCell className={`text-right font-medium ${
                           transaction.type === 'inflow' ? 'text-green-600' : 'text-orange-600'
                         }`}>
-                          ${transaction.amount.toFixed(2)}
+                          {transaction.type === 'inflow' ? '+' : '-'}${transaction.amount.toFixed(2)}
                         </TableCell>
                         <TableCell>{transaction.added_by_name}</TableCell>
                       </TableRow>

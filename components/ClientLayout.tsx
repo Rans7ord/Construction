@@ -3,6 +3,7 @@
 import React, { useLayoutEffect, useState, useEffect } from "react"
 import { AuthProvider } from '@/lib/auth-context'
 import { DataProvider } from '@/lib/data-context'
+import { Toaster } from 'sonner'  // ADD THIS
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
@@ -42,6 +43,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <DataProvider>
         {children}
+        <Toaster position="top-right" richColors />  {/* ADD THIS */}
       </DataProvider>
     </AuthProvider>
   )

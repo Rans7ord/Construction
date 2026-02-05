@@ -38,6 +38,10 @@ export default function UsersPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [formData, setFormData] = useState({ name: '', email: '', role: 'staff' as UserRole });
+  
+  // Add these state variables
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -46,26 +50,83 @@ export default function UsersPage() {
     }
   }, [user, router]);
 
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchUsers();
+    }
+  }, [user]);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/users');
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error('Fetch users error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!mounted || user?.role !== 'admin') return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (loading) {
+    return (
+      <ProtectedLayout>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+          <DashboardHeader user={user!} />
+          <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading users...</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </ProtectedLayout>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingUser) {
-      updateUser(editingUser.id, formData as Partial<User>);
-      setEditingUser(null);
-    } else {
-      createUser(formData as any);
+    try {
+      if (editingUser) {
+        await updateUser(editingUser.id, formData as Partial<User>);
+        setEditingUser(null);
+      } else {
+        await createUser(formData as any);
+      }
+      
+      setFormData({ name: '', email: '', role: 'staff' });
+      setIsOpen(false);
+      
+      // Refresh the users list
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error saving user:', error);
     }
-    
-    setFormData({ name: '', email: '', role: 'staff' });
-    setIsOpen(false);
   };
 
   const handleEdit = (userData: any) => {
     setEditingUser(userData);
     setFormData({ name: userData.name, email: userData.email, role: userData.role });
     setIsOpen(true);
+  };
+
+  const handleDelete = async (userId: string) => {
+    if (confirm('Are you sure you want to delete this user?')) {
+      try {
+        await deleteUser(userId);
+        // Refresh the users list
+        await fetchUsers();
+      } catch (error) {
+        console.error('Error deleting user:', error);
+      }
+    }
   };
 
   const handleClose = () => {
@@ -140,9 +201,14 @@ export default function UsersPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button type="submit" className="w-full">
-                    {editingUser ? 'Update User' : 'Create User'}
-                  </Button>
+                  <div className="flex gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="flex-1">
+                      {editingUser ? 'Update User' : 'Create User'}
+                    </Button>
+                  </div>
                 </form>
               </DialogContent>
             </Dialog>
@@ -161,52 +227,60 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {state.users.map((userData) => (
-                    <tr key={userData.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold">
-                            {userData.name.charAt(0)}
-                          </div>
-                          <span className="font-medium text-foreground">{userData.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground">{userData.email}</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-primary/10 text-primary capitalize">
-                          {userData.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {userData.id !== user.id && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEdit(userData)}
-                                className="gap-1"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:bg-destructive/10"
-                                onClick={() => deleteUser(userData.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                          {userData.id === user.id && (
-                            <span className="text-xs text-muted-foreground">Your Account</span>
-                          )}
-                        </div>
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                        No users found. Click "Add User" to create your first team member.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    users.map((userData) => (
+                      <tr key={userData.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-semibold">
+                              {userData.name?.charAt(0) || 'U'}
+                            </div>
+                            <span className="font-medium text-foreground">{userData.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-muted-foreground">{userData.email}</td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-primary/10 text-primary capitalize">
+                            {userData.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {userData.id !== user?.id && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEdit(userData)}
+                                  className="gap-1"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDelete(userData.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                            {userData.id === user?.id && (
+                              <span className="text-xs text-muted-foreground">Your Account</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

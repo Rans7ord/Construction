@@ -47,15 +47,43 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const totalBudget = project.totalBudget;
-  const totalSpent = projectExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + m.amount, 0);
+  // Convert budget to number and ensure it's valid
+  const totalBudget = Number(project.totalBudget) || 0;
+  const totalSpent = projectExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
   const remaining = totalBudget - totalSpent;
-  const percentageSpent = (totalSpent / totalBudget) * 100;
+  const percentageSpent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+  const formatAmount = (amount: number) => {
+    if (amount >= 1000000) {
+      return `₵${(amount / 1000000).toFixed(2)}M`;
+    } else if (amount >= 1000) {
+      return `₵${(amount / 1000).toFixed(1)}K`;
+    } else {
+      return `₵${amount.toLocaleString()}`;
+    }
+  };
 
   const handleDeleteProject = () => {
     deleteProject(projectId);
     router.push('/dashboard');
+  };
+
+  // Function to safely format dates
+  const formatDate = (dateString: string | Date) => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   return (
@@ -79,8 +107,8 @@ export default function ProjectDetailPage() {
               <div>
                 <h1 className="text-4xl font-bold text-foreground mb-2">{project.name}</h1>
                 <div className="flex gap-4 text-sm text-muted-foreground">
-                  <span>📍 {project.location}</span>
-                  <span>👤 {project.clientName}</span>
+                  <span>📍 {project.location || 'No location specified'}</span>
+                  <span>👤 {project.clientName || 'No client name'}</span>
                 </div>
               </div>
               <div className="flex gap-2 flex-wrap">
@@ -113,7 +141,7 @@ export default function ProjectDetailPage() {
                   </>
                 )}
                 <span className="px-4 py-2 rounded-lg bg-green-500/10 text-green-700 font-medium">
-                  {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                  {project.status?.charAt(0)?.toUpperCase() + project.status?.slice(1) || 'Active'}
                 </span>
               </div>
             </div>
@@ -123,20 +151,29 @@ export default function ProjectDetailPage() {
           <div className="grid gap-4 md:grid-cols-4 mb-8">
             <Card className="p-6 border-border/50">
               <p className="text-sm text-muted-foreground mb-2">Total Budget</p>
-              <p className="text-3xl font-bold text-foreground">₵{(totalBudget / 1000).toFixed(1)}K</p>
+              <p className="text-3xl font-bold text-primary">
+                {formatAmount(totalBudget)}
+              </p>
             </Card>
             <Card className="p-6 border-border/50">
               <p className="text-sm text-muted-foreground mb-2">Total Income/Contract</p>
-              <p className="text-3xl font-bold text-green-600">₵{(totalIncome / 1000).toFixed(1)}K</p>
+              <p className="text-3xl font-bold text-green-600">
+                {formatAmount(totalIncome)}
+              </p>
             </Card>
             <Card className="p-6 border-border/50">
               <p className="text-sm text-muted-foreground mb-2">Total Spent/Expenditure</p>
-              <p className="text-3xl font-bold text-orange-600">₵{(totalSpent / 1000).toFixed(1)}K</p>
+              <p className="text-3xl font-bold text-orange-600">
+                {formatAmount(totalSpent)}
+              </p>
             </Card>
             <Card className="p-6 border-border/50">
               <p className="text-sm text-muted-foreground mb-2">Remaining</p>
               <p className={`text-3xl font-bold ${remaining >= 0 ? 'text-blue-600' : 'text-destructive'}`}>
-                ₵{(remaining / 1000).toFixed(1)}K
+                {formatAmount(Math.abs(remaining))}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {remaining >= 0 ? 'Budget surplus' : 'Budget overrun'}
               </p>
             </Card>
           </div>
@@ -186,18 +223,97 @@ export default function ProjectDetailPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Timeline</p>
                       <p className="text-foreground mt-1">
-                        {new Date(project.startDate).toLocaleDateString()} -{' '}
-                        {new Date(project.endDate).toLocaleDateString()}
+                        {formatDate(project.startDate)} - {formatDate(project.endDate)}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Client Contact</p>
-                      <p className="text-foreground mt-1">{project.clientEmail}</p>
+                      <p className="text-foreground mt-1">{project.clientEmail || 'No email provided'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Created</p>
                       <p className="text-foreground mt-1">
-                        {new Date(project.createdAt).toLocaleDateString()}
+                        {formatDate(project.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Budget Summary with Proper Calculation */}
+                <Card className="p-6 border-border/50">
+                  <h3 className="text-lg font-semibold mb-4">Budget Summary</h3>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Budget</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {formatAmount(totalBudget)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Approved project budget
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Spent</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {formatAmount(totalSpent)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Actual expenditure to date
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Remaining Balance</p>
+                      <p className={`text-2xl font-bold ${remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatAmount(Math.abs(remaining))}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {remaining >= 0 ? 'Available balance' : 'Budget overrun by'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-sm text-muted-foreground mb-1">Budget Utilization</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 h-2 bg-border rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-primary to-accent"
+                          style={{ width: `${Math.min(percentageSpent, 100)}%` }}
+                        ></div>
+                      </div>
+                      <span className="ml-2 text-sm font-medium">{percentageSpent.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Project Statistics */}
+                <Card className="p-6 border-border/50">
+                  <h3 className="text-lg font-semibold mb-4">Project Statistics</h3>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Project Steps</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {projectSteps.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total project phases
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Expenses</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {projectExpenses.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Individual expense items
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Income Sources</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {projectMoneyIn.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Payment/revenue entries
                       </p>
                     </div>
                   </div>
