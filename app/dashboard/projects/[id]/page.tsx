@@ -325,7 +325,7 @@ export default function ProjectDetailPage() {
 
             {activeTab === 'materials' && (
               <div className="space-y-6">
-                <MaterialsSection projectId={projectId} />
+                <MaterialsSection projectId={projectId} steps={projectSteps} />
               </div>
             )}
 

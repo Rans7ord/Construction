@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json(
       {
         message: 'Login successful',
+        authenticated: true,
         user: {
           id: user.id,
           name: user.name,
@@ -68,11 +69,19 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
 
+    // ✅ IMPROVED: Cookie with proper configuration
     response.cookies.set('authToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 24 * 60 * 60, // 24 hours
+      path: '/', // ✅ Ensures cookie is available site-wide
+    });
+
+    // ✅ OPTIONAL: Set a client-readable flag cookie for better UX
+    response.cookies.set('isAuthenticated', 'true', {
+      maxAge: 24 * 60 * 60,
+      path: '/',
     });
 
     return response;

@@ -16,7 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,6 +26,13 @@ export default function LoginPage() {
       setSuccess(message);
     }
   }, [searchParams]);
+
+  // If user is already logged in, redirect to dashboard
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +51,7 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include', // Important: Include cookies
       });
 
       const data = await response.json();
@@ -53,11 +61,29 @@ export default function LoginPage() {
         return;
       }
 
-      // Update auth context
-      login(email, password);
+      // ✅ FIX: IMPORTANT: Wait for auth context to update
+      const loginSuccess = await login(email, password);
+      
+      if (!loginSuccess) {
+        setError('Failed to update authentication state');
+        return;
+      }
 
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // ✅ FIX: Wait a bit to ensure cookie is set and auth state is synchronized
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      // ✅ FIX: Double-check auth before redirecting
+      const verifyResponse = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+      
+      if (verifyResponse.ok) {
+        // ✅ Now redirect - auth is confirmed
+        router.push('/dashboard');
+      } else {
+        setError('Authentication verification failed. Please try again.');
+      }
+      
     } catch (err) {
       setError('An error occurred. Please try again.');
       console.error('[v0] Login error:', err);
@@ -65,6 +91,20 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  // Show loading if user is already authenticated (redirecting)
+  if (user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary via-background to-secondary p-4">
+        <Card className="w-full max-w-md shadow-xl border-primary/20">
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Already logged in. Redirecting to dashboard...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary via-background to-secondary p-4">
@@ -99,6 +139,7 @@ export default function LoginPage() {
                 disabled={isLoading}
                 className="w-full px-4 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition disabled:opacity-50"
                 placeholder="email@example.com"
+                required
               />
             </div>
 
@@ -111,6 +152,7 @@ export default function LoginPage() {
                 disabled={isLoading}
                 className="w-full px-4 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition disabled:opacity-50"
                 placeholder="••••••••"
+                required
               />
             </div>
 

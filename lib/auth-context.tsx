@@ -22,13 +22,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me');
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include', // ✅ Ensure cookies are sent
+      });
+      
       if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
+        const userData = await response.json();
+        // ✅ Handle both response formats
+        setUser(userData.user || userData);
+      } else {
+        setUser(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -40,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include', // ✅ Ensure cookies are received
       });
 
       if (response.ok) {
@@ -56,7 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include', // ✅ Ensure cookies are cleared
+      });
     } catch (error) {
       console.error('Logout failed:', error);
     } finally {

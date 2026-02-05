@@ -71,7 +71,7 @@ export default function PettyCashPage() {
     endDate: '',
     category: '',
     vendor: '',
-    type: '',
+    type: 'all',
   });
 
   const fetchPettyCash = async () => {
@@ -81,7 +81,7 @@ export default function PettyCashPage() {
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.category) params.append('category', filters.category);
       if (filters.vendor) params.append('vendor', filters.vendor);
-      if (filters.type) params.append('type', filters.type);
+      if (filters.type && filters.type !== 'all') params.append('type', filters.type);
 
       const response = await fetch(`/api/petty-cash?${params.toString()}`);
       if (response.ok) {
@@ -242,7 +242,7 @@ export default function PettyCashPage() {
       endDate: '',
       category: '',
       vendor: '',
-      type: '',
+      type: 'all',
     });
   };
 
@@ -428,7 +428,12 @@ export default function PettyCashPage() {
           <Card className="p-6 mb-8 border-border/50">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Filters</h3>
-              <Button variant="outline" size="sm" onClick={clearFilters} disabled={!filters.startDate && !filters.endDate && !filters.category && !filters.vendor && !filters.type}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearFilters} 
+                disabled={!filters.startDate && !filters.endDate && !filters.category && !filters.vendor && filters.type === 'all'}
+              >
                 Clear Filters
               </Button>
             </div>
@@ -481,7 +486,7 @@ export default function PettyCashPage() {
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Types</SelectItem>
+                    <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="inflow">Inflow</SelectItem>
                     <SelectItem value="outflow">Outflow</SelectItem>
                   </SelectContent>
@@ -496,7 +501,7 @@ export default function PettyCashPage() {
             {data.transactions.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground mb-4">No transactions found</p>
-                {filters.startDate || filters.endDate || filters.category || filters.vendor || filters.type ? (
+                {filters.startDate || filters.endDate || filters.category || filters.vendor || filters.type !== 'all' ? (
                   <Button variant="outline" onClick={clearFilters}>
                     Clear filters to see all transactions
                   </Button>
@@ -543,7 +548,7 @@ export default function PettyCashPage() {
                         <TableCell className={`text-right font-medium ${
                           transaction.type === 'inflow' ? 'text-green-600' : 'text-orange-600'
                         }`}>
-                          {transaction.type === 'inflow' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                          {transaction.type === 'inflow' ? '+' : '-'}${parseFloat(transaction.amount).toFixed(2)}
                         </TableCell>
                         <TableCell>{transaction.added_by_name}</TableCell>
                       </TableRow>

@@ -1,3 +1,5 @@
+// components/materials-section.tsx
+
 'use client';
 
 import React from "react"
@@ -5,8 +7,10 @@ import React from "react"
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, BarChart3 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useData } from '@/lib/data-context';
+import { useAuth } from '@/lib/auth-context';
 
 interface Material {
   id: string;
@@ -25,19 +29,22 @@ interface MaterialsSectionProps {
   projectId: string;
   stepId?: string;
   readOnly?: boolean;
+  steps?: any[]; // Add steps prop for grouping
 }
 
-export default function MaterialsSection({ projectId, stepId, readOnly = false }: MaterialsSectionProps) {
+export default function MaterialsSection({ projectId, stepId, readOnly = false, steps = [] }: MaterialsSectionProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
+    stepId: stepId || '',
     name: '',
     type: '',
     quantity: '',
     unit: 'pcs',
     description: '',
   });
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchMaterials();
@@ -65,7 +72,8 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
     e.preventDefault();
     
     // Validate required fields
-    if (!formData.name || !formData.type || !formData.quantity) {
+    const selectedStepId = stepId || formData.stepId;
+    if (!selectedStepId || !formData.name || !formData.type || !formData.quantity) {
       alert('Please fill in all required fields');
       return;
     }
@@ -85,7 +93,7 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          stepId: stepId || projectId, // Fallback to projectId if no stepId
+          stepId: selectedStepId,
           name: formData.name,
           type: formData.type,
           quantity: quantity,
@@ -101,7 +109,7 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
       }
 
       // Success - clear form and close dialog
-      setFormData({ name: '', type: '', quantity: '', unit: 'pcs', description: '' });
+      setFormData({ stepId: stepId || '', name: '', type: '', quantity: '', unit: 'pcs', description: '' });
       setIsOpen(false);
       
       // Refetch materials
@@ -155,6 +163,26 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
                 <DialogTitle>Add New Material</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAddMaterial} className="space-y-4">
+                {!stepId && steps.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Project Step *</label>
+                    <select
+                      value={formData.stepId}
+                      onChange={(e) => setFormData({ ...formData, stepId: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      required
+                      disabled={isLoading}
+                    >
+                      <option value="">Select a step</option>
+                      {steps.map((step) => (
+                        <option key={step.id} value={step.id}>
+                          {step.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Material Name *</label>
                   <input
@@ -256,47 +284,70 @@ export default function MaterialsSection({ projectId, stepId, readOnly = false }
       </div>
 
       {materials.length === 0 ? (
-        <div className="text-center py-8">
+        <Card className="p-8 text-center border-border/50">
           <p className="text-muted-foreground">No materials added yet</p>
-        </div>
+        </Card>
       ) : (
-        <div className="space-y-3">
-          {materials.map((material) => (
-            <div key={material.id} className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">{material.name}</h3>
-                  <p className="text-sm text-muted-foreground">{material.type}</p>
-                </div>
-                {!readOnly && (
-                  <button
-                    onClick={() => handleDelete(material.id)}
-                    className="p-1 text-destructive hover:bg-destructive/10 rounded transition"
-                    disabled={isLoading}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+        <div className="space-y-4">
+          {steps.map((step) => {
+            const stepMaterials = materials.filter((m) => m.stepId === step.id);
+            if (stepMaterials.length === 0) return null;
 
-              <div className="flex items-center gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Quantity</p>
-                  <p className="font-medium">{material.quantity} {material.unit}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Status</p>
-                  <p className="font-medium capitalize">{material.status}</p>
-                </div>
-              </div>
+            return (
+              <div key={step.id}>
+                <Card className="p-4 bg-gradient-to-r from-primary/5 to-transparent border-primary/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <BarChart3 className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">{step.name}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {stepMaterials.length} material{stepMaterials.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
-              {material.description && (
-                <p className="text-sm text-muted-foreground mt-3 pt-3 border-t border-border/50">
-                  {material.description}
-                </p>
-              )}
-            </div>
-          ))}
+                  <div className="mt-4 space-y-2">
+                    {stepMaterials.map((material) => (
+                      <div
+                        key={material.id}
+                        className="p-3 bg-background rounded border border-border/50 flex items-center justify-between group hover:border-primary/30 transition"
+                      >
+                        <div className="flex-1">
+                          <h5 className="font-medium text-sm">{material.name}</h5>
+                          <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                            <span>📦 {material.type}</span>
+                            <span>📊 {material.quantity} {material.unit}</span>
+                            <span>📋 {material.status}</span>
+                          </div>
+                          {material.description && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {material.description}
+                            </p>
+                          )}
+                        </div>
+                        {user?.role === 'admin' && !readOnly && (
+                          <div className="flex gap-2 ml-4 opacity-0 group-hover:opacity-100 transition">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(material.id)}
+                              className="text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            );
+          })}
         </div>
       )}
     </Card>

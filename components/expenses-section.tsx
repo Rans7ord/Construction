@@ -1,3 +1,5 @@
+//comp
+
 'use client';
 
 import { Expense, ProjectStep } from '@/lib/store';

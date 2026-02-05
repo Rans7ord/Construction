@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, queryOne } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-function getUserFromToken(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
-  if (!token) return null;
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    return decoded;
-  } catch (error) {
-    return null;
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,6 +15,28 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const vendor = searchParams.get('vendor');
     const type = searchParams.get('type');
+
+    // Check if petty_cash table exists
+    let tableExists = true;
+    try {
+      await query('SELECT 1 FROM petty_cash LIMIT 1');
+    } catch (error: any) {
+      if (error.code === 'ER_NO_SUCH_TABLE') {
+        tableExists = false;
+      } else {
+        throw error;
+      }
+    }
+
+    if (!tableExists) {
+      // Table doesn't exist, return empty data
+      return NextResponse.json({
+        transactions: [],
+        balance: 0,
+        inflows: 0,
+        outflows: 0
+      });
+    }
 
     let sql = 'SELECT pc.*, u.name as added_by_name FROM petty_cash pc LEFT JOIN users u ON pc.added_by = u.id';
     let params: any[] = [];
@@ -90,12 +97,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[PETTY CASH] Starting POST request');
+
     const session = await getServerSession();
+    console.log('[PETTY CASH] Session:', session);
+
     if (!session?.user) {
+      console.log('[PETTY CASH] No session or user');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
+    console.log('[PETTY CASH] Request body:', body);
+
     const {
       amount,
       description,
@@ -107,6 +121,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!amount || !description || !type || !date) {
+      console.log('[PETTY CASH] Missing required fields:', { amount, description, type, date });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -114,28 +129,82 @@ export async function POST(request: NextRequest) {
     }
 
     if (!['inflow', 'outflow'].includes(type)) {
+      console.log('[PETTY CASH] Invalid transaction type:', type);
       return NextResponse.json(
         { error: 'Invalid transaction type' },
         { status: 400 }
       );
     }
 
-    const result = await execute(
-      `INSERT INTO petty_cash (
-        amount, description, category, vendor, type, date, added_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        amount,
-        description,
-        category || null,
-        vendor || null,
-        type,
-        date,
-        session.user.id
-      ]
-    );
+    console.log('[PETTY CASH] Validation passed, proceeding with insert');
 
-    const transactionId = (result as any).insertId;
+    // Generate unique ID for the transaction
+    const transactionId = `petty_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Check if petty_cash table exists, create it if it doesn't
+    try {
+      await execute(
+        `INSERT INTO petty_cash (
+          id, amount, description, category, vendor, type, date, added_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          transactionId,
+          amount,
+          description,
+          category || null,
+          vendor || null,
+          type,
+          date,
+          session.user.id
+        ]
+      );
+    } catch (tableError: any) {
+      // If table doesn't exist, create it and retry
+      if (tableError.code === 'ER_NO_SUCH_TABLE') {
+        console.log('Petty cash table not found, creating it...');
+
+        // Create petty_cash table
+        await execute(`
+          CREATE TABLE IF NOT EXISTS petty_cash (
+            id VARCHAR(50) PRIMARY KEY,
+            amount DECIMAL(15, 2) NOT NULL,
+            description VARCHAR(255) NOT NULL,
+            category VARCHAR(100),
+            vendor VARCHAR(255),
+            type ENUM('inflow', 'outflow') NOT NULL,
+            date DATE NOT NULL,
+            added_by VARCHAR(50) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE RESTRICT,
+            INDEX idx_date (date),
+            INDEX idx_type (type),
+            INDEX idx_category (category),
+            INDEX idx_vendor (vendor),
+            INDEX idx_added_by (added_by)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+        // Now try the insert again
+        await execute(
+          `INSERT INTO petty_cash (
+            id, amount, description, category, vendor, type, date, added_by
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            transactionId,
+            amount,
+            description,
+            category || null,
+            vendor || null,
+            type,
+            date,
+            session.user.id
+          ]
+        );
+      } else {
+        throw tableError;
+      }
+    }
 
     // Get the created transaction
     const transaction = await queryOne<any>(
