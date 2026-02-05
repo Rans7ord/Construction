@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/lib/data-context';
 import { DashboardHeader } from '@/components/dashboard-header';
+import { UserRole, User } from '@/lib/store';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
 import {
   Dialog,
@@ -36,7 +37,7 @@ export default function UsersPage() {
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
-  const [formData, setFormData] = useState({ name: '', email: '', role: 'staff' });
+  const [formData, setFormData] = useState({ name: '', email: '', role: 'staff' as UserRole });
 
   useEffect(() => {
     setMounted(true);
@@ -51,7 +52,7 @@ export default function UsersPage() {
     e.preventDefault();
     
     if (editingUser) {
-      updateUser(editingUser.id, formData);
+      updateUser(editingUser.id, formData as Partial<User>);
       setEditingUser(null);
     } else {
       createUser(formData as any);
@@ -128,7 +129,7 @@ export default function UsersPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="role">Role</Label>
-                    <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                    <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value as UserRole })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>

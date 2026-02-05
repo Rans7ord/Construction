@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, queryOne } from '@/lib/db';
+import { query, queryOne, execute } from '@/lib/db';
+import jwt from 'jsonwebtoken';
 
 export async function GET(
   request: NextRequest,

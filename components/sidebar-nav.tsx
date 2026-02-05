@@ -23,8 +23,14 @@ const menuItems = [
   },
   {
     label: 'Projects',
-    href: '/dashboard',
+    href: '/dashboard/projects',
     icon: FolderOpen,
+    roles: ['admin', 'supervisor', 'staff'],
+  },
+  {
+    label: 'Petty Cash',
+    href: '/dashboard/petty-cash',
+    icon: Wallet,
     roles: ['admin', 'supervisor', 'staff'],
   },
   {
@@ -32,12 +38,6 @@ const menuItems = [
     href: '/dashboard/reports',
     icon: BarChart3,
     roles: ['admin', 'supervisor', 'staff'],
-  },
-  {
-    label: 'Petty Cash',
-    href: '/dashboard/petty-cash',
-    icon: Wallet,
-    roles: ['admin', 'supervisor'],
   },
   {
     label: 'User Management',

@@ -1,84 +1,111 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { query, execute, queryOne } from '@/lib/db';
+import { getServerSession } from '@/lib/auth';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Get petty cash transactions with filters
+function getUserFromToken(request: NextRequest) {
+  const token = request.cookies.get('token')?.value;
+  if (!token) return null;
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth_token')?.value;
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await getServerSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify token
-    jwt.verify(token, JWT_SECRET);
-
-    const searchParams = request.nextUrl.searchParams;
+    const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const category = searchParams.get('category');
     const vendor = searchParams.get('vendor');
     const type = searchParams.get('type');
 
-    let query = 'SELECT * FROM petty_cash WHERE 1=1';
-    const params: any[] = [];
+    let sql = 'SELECT pc.*, u.name as added_by_name FROM petty_cash pc LEFT JOIN users u ON pc.added_by = u.id';
+    let params: any[] = [];
+    let conditions: string[] = [];
 
     if (startDate) {
-      query += ' AND date >= ?';
+      conditions.push('pc.date >= ?');
       params.push(startDate);
     }
+
     if (endDate) {
-      query += ' AND date <= ?';
+      conditions.push('pc.date <= ?');
       params.push(endDate);
     }
+
     if (category) {
-      query += ' AND category = ?';
+      conditions.push('pc.category = ?');
       params.push(category);
     }
+
     if (vendor) {
-      query += ' AND vendor = ?';
+      conditions.push('pc.vendor = ?');
       params.push(vendor);
     }
+
     if (type) {
-      query += ' AND type = ?';
+      conditions.push('pc.type = ?');
       params.push(type);
     }
 
-    query += ' ORDER BY date DESC';
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
 
-    const connection = await pool.getConnection();
-    const [transactions] = await connection.execute(query, params);
-    connection.release();
+    sql += ' ORDER BY pc.date DESC, pc.created_at DESC';
 
-    return NextResponse.json(transactions);
+    const transactions = await query<any>(sql, params);
+
+    // Calculate balance
+    const inflows = transactions.filter(t => t.type === 'inflow').reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const outflows = transactions.filter(t => t.type === 'outflow').reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const balance = inflows - outflows;
+
+    return NextResponse.json({
+      transactions,
+      balance,
+      inflows,
+      outflows
+    });
   } catch (error) {
-    console.error('[v0] Petty cash GET error:', error);
+    console.error('Get petty cash error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch petty cash transactions' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
-// Add new petty cash transaction
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get('auth_token')?.value;
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await getServerSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const { amount, description, category, vendor, type, date } = await request.json();
+    const body = await request.json();
+    const {
+      amount,
+      description,
+      category,
+      vendor,
+      type,
+      date
+    } = body;
 
+    // Validate required fields
     if (!amount || !description || !type || !date) {
       return NextResponse.json(
         { error: 'Missing required fields' },
@@ -88,77 +115,39 @@ export async function POST(request: NextRequest) {
 
     if (!['inflow', 'outflow'].includes(type)) {
       return NextResponse.json(
-        { error: 'Invalid type. Must be inflow or outflow' },
+        { error: 'Invalid transaction type' },
         { status: 400 }
       );
     }
 
-    const id = `petty_${Date.now()}`;
-    const connection = await pool.getConnection();
-
-    const query = `
-      INSERT INTO petty_cash (id, amount, description, category, vendor, type, date, added_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    await connection.execute(query, [
-      id,
-      amount,
-      description,
-      category || null,
-      vendor || null,
-      type,
-      date,
-      decoded.id,
-    ]);
-
-    connection.release();
-
-    return NextResponse.json(
-      { id, message: 'Transaction added successfully' },
-      { status: 201 }
+    const result = await execute(
+      `INSERT INTO petty_cash (
+        amount, description, category, vendor, type, date, added_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        amount,
+        description,
+        category || null,
+        vendor || null,
+        type,
+        date,
+        session.user.id
+      ]
     );
-  } catch (error) {
-    console.error('[v0] Petty cash POST error:', error);
-    return NextResponse.json(
-      { error: 'Failed to add petty cash transaction' },
-      { status: 500 }
+
+    const transactionId = (result as any).insertId;
+
+    // Get the created transaction
+    const transaction = await queryOne<any>(
+      'SELECT pc.*, u.name as added_by_name FROM petty_cash pc LEFT JOIN users u ON pc.added_by = u.id WHERE pc.id = ?',
+      [transactionId]
     );
-  }
-}
 
-// Delete petty cash transaction
-export async function DELETE(request: NextRequest) {
-  try {
-    const token = request.cookies.get('auth_token')?.value;
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    jwt.verify(token, JWT_SECRET);
-
-    const searchParams = request.nextUrl.searchParams;
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Transaction ID is required' },
-        { status: 400 }
-      );
-    }
-
-    const connection = await pool.getConnection();
-    await connection.execute('DELETE FROM petty_cash WHERE id = ?', [id]);
-    connection.release();
-
-    return NextResponse.json({ message: 'Transaction deleted successfully' });
+    return NextResponse.json(transaction, { status: 201 });
   } catch (error) {
-    console.error('[v0] Petty cash DELETE error:', error);
+    console.error('Create petty cash transaction error:', error);
     return NextResponse.json(
-      { error: 'Failed to delete petty cash transaction' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -6,12 +6,20 @@ import { v4 as uuidv4 } from 'uuid';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, name } = body;
+    const { email, password, name, role } = body;
 
     // Validate input
-    if (!email || !password || !name) {
+    if (!email || !password || !name || !role) {
       return NextResponse.json(
-        { error: 'Email, password, and name are required' },
+        { error: 'Email, password, name, and role are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate role
+    if (!['admin', 'supervisor', 'staff'].includes(role)) {
+      return NextResponse.json(
+        { error: 'Invalid role. Must be admin, supervisor, or staff' },
         { status: 400 }
       );
     }
@@ -37,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Create user
     await query(
       'INSERT INTO users (id, name, email, password, role, company_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, name, email, hashedPassword, 'staff', companyId]
+      [userId, name, email, hashedPassword, role, companyId]
     );
 
     return NextResponse.json(

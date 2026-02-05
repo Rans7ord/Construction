@@ -109,7 +109,7 @@ export default function ReportsPage() {
   };
 
   const handleExportCSV = () => {
-    if (selectedProjectId !== 'all') {
+    if (selectedProjectId !== 'all' && selectedProjectId !== null) {
       exportProjectToExcel(selectedProjectId);
     } else {
       // Export all projects
@@ -153,7 +153,7 @@ export default function ReportsPage() {
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Select Project
                 </label>
-                <Select value={selectedProjectId} onValueChange={(value) => setSelectedProjectId(value)}>
+                <Select value={selectedProjectId || undefined} onValueChange={(value) => setSelectedProjectId(value)}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
@@ -170,7 +170,7 @@ export default function ReportsPage() {
               {selectedProjectId !== 'all' && (
                 <Button
                   variant="outline"
-                  onClick={() => exportProjectToExcel(selectedProjectId)}
+                  onClick={() => selectedProjectId && exportProjectToExcel(selectedProjectId)}
                   className="gap-2"
                 >
                   <Download className="w-4 h-4" />

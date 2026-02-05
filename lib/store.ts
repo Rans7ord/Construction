@@ -55,6 +55,19 @@ export interface Expense {
   createdBy: string;
 }
 
+export interface Material {
+  id: string;
+  projectId: string;
+  stepId?: string;
+  materialName: string;
+  materialType: string;
+  quantity: number;
+  unit: string;
+  description?: string;
+  costPerUnit: number;
+  totalCost: number;
+}
+
 export interface AppState {
   currentUser: User | null;
   users: User[];
@@ -66,9 +79,9 @@ export interface AppState {
 
 const STORAGE_KEY = 'buildmanager_state';
 
-// Initialize with empty state
-const initializeEmptyState = (): AppState => {
-  const emptyState: AppState = {
+// Initialize with demo data
+const initializeDemoData = (): AppState => {
+  const demoState: AppState = {
     currentUser: null,
     users: [],
     projects: [],
@@ -77,19 +90,19 @@ const initializeEmptyState = (): AppState => {
     expenses: [],
   };
 
-  return emptyState;
+  return demoState;
 };
 
 export const getStoredState = (): AppState => {
   if (typeof window === 'undefined') {
-    return initializeEmptyState();
+    return initializeDemoData();
   }
 
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) {
-    const emptyState = initializeEmptyState();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(emptyState));
-    return emptyState;
+    const demoState = initializeDemoData();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(demoState));
+    return demoState;
   }
 
   return JSON.parse(stored);

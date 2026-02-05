@@ -40,13 +40,26 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Update auth context with real database authentication
-      await login(email, password);
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Login failed');
+        return;
+      }
+
+      // Update auth context
+      login(email, password);
 
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err) {
-      setError('Invalid email or password');
+      setError('An error occurred. Please try again.');
       console.error('[v0] Login error:', err);
     } finally {
       setIsLoading(false);

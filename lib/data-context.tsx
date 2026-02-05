@@ -11,10 +11,10 @@ import {
   getStoredState,
   saveState,
 } from './store';
+import { useAuth } from './auth-context';
 
 interface DataContextType {
   state: AppState;
-  isLoading: boolean;
   createProject: (project: Omit<Project, 'id' | 'createdAt'>) => Promise<void>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
@@ -27,63 +27,57 @@ interface DataContextType {
   addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
   updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
-  createUser: (user: Omit<User, 'id' | 'companyId'>) => Promise<void>;
-  updateUser: (id: string, updates: Partial<User>) => Promise<void>;
-  deleteUser: (id: string) => Promise<void>;
+  createUser: (user: Omit<User, 'id' | 'companyId'>) => void;
+  updateUser: (id: string, updates: Partial<User>) => void;
+  deleteUser: (id: string) => void;
   exportProjectToExcel: (projectId: string) => void;
-  fetchProjects: () => Promise<void>;
-  fetchUsers: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [state, setState] = useState<AppState>(getStoredState());
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch projects from database
-  const fetchProjects = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/projects', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      
-      if (!response.ok) {
-        setState((prev) => ({ ...prev, projects: [] }));
-        return;
-      }
-      const projects = await response.json();
-      setState((prev) => ({ ...prev, projects: projects || [] }));
-    } catch (error) {
-      setState((prev) => ({ ...prev, projects: [] }));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
 
-  // Fetch users from database
-  const fetchUsers = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/users', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      
-      if (!response.ok) {
-        setState((prev) => ({ ...prev, users: [] }));
-        return;
+      try {
+        // Load projects
+        const projectsResponse = await fetch('/api/projects');
+        if (projectsResponse.ok) {
+          const projects = await projectsResponse.json();
+          setState(prev => ({ ...prev, projects }));
+        }
+
+        // Load steps
+        const stepsResponse = await fetch('/api/steps');
+        if (stepsResponse.ok) {
+          const steps = await stepsResponse.json();
+          setState(prev => ({ ...prev, steps }));
+        }
+
+        // Load expenses
+        const expensesResponse = await fetch('/api/expenses');
+        if (expensesResponse.ok) {
+          const expenses = await expensesResponse.json();
+          setState(prev => ({ ...prev, expenses }));
+        }
+
+        // Load money-in
+        const moneyInResponse = await fetch('/api/money-in');
+        if (moneyInResponse.ok) {
+          const moneyIn = await moneyInResponse.json();
+          setState(prev => ({ ...prev, moneyIn }));
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
       }
-      const users = await response.json();
-      setState((prev) => ({ ...prev, users: users || [] }));
-    } catch (error) {
-      setState((prev) => ({ ...prev, users: [] }));
-    } finally {
-      setIsLoading(false);
-    }
-  }
+    };
+
+    loadData();
+  }, [user]);
 
   const saveAndUpdate = (newState: AppState) => {
     setState(newState);
@@ -94,14 +88,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(project),
       });
-      if (!response.ok) throw new Error('Failed to create project');
-      await fetchProjects();
+
+      if (response.ok) {
+        const newProject = await response.json();
+        setState(prev => ({
+          ...prev,
+          projects: [...prev.projects, newProject],
+        }));
+      } else {
+        throw new Error('Failed to create project');
+      }
     } catch (error) {
-      console.error('[v0] Create project error:', error);
+      console.error('Create project error:', error);
       throw error;
     }
   };
@@ -110,76 +113,121 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/projects/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(updates),
       });
-      if (!response.ok) throw new Error('Failed to update project');
-      await fetchProjects();
+
+      if (response.ok) {
+        const updatedProject = await response.json();
+        setState(prev => ({
+          ...prev,
+          projects: prev.projects.map((p) => (p.id === id ? updatedProject : p)),
+        }));
+      } else {
+        throw new Error('Failed to update project');
+      }
     } catch (error) {
-      console.error('[v0] Update project error:', error);
+      console.error('Update project error:', error);
       throw error;
     }
   };
 
   const deleteProject = async (id: string) => {
-    if (state.currentUser?.role !== 'admin') return;
+    if (!user || user.role !== 'admin') return;
+
     try {
       const response = await fetch(`/api/projects/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to delete project');
-      await fetchProjects();
+
+      if (response.ok) {
+        setState(prev => ({
+          ...prev,
+          projects: prev.projects.filter((p) => p.id !== id),
+          steps: prev.steps.filter((s) => s.projectId !== id),
+          moneyIn: prev.moneyIn.filter((m) => m.projectId !== id),
+          expenses: prev.expenses.filter((e) => e.projectId !== id),
+        }));
+      } else {
+        throw new Error('Failed to delete project');
+      }
     } catch (error) {
-      console.error('[v0] Delete project error:', error);
+      console.error('Delete project error:', error);
       throw error;
     }
   };
 
   const createStep = async (step: Omit<ProjectStep, 'id'>) => {
     try {
-      const response = await fetch('/api/project-steps', {
+      const response = await fetch('/api/steps', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(step),
       });
-      if (!response.ok) throw new Error('Failed to create step');
-      await fetchProjects();
+
+      if (response.ok) {
+        const newStep = await response.json();
+        setState(prev => ({
+          ...prev,
+          steps: [...prev.steps, newStep],
+        }));
+      } else {
+        throw new Error('Failed to create step');
+      }
     } catch (error) {
-      console.error('[v0] Create step error:', error);
+      console.error('Create step error:', error);
       throw error;
     }
   };
 
   const updateStep = async (id: string, updates: Partial<ProjectStep>) => {
     try {
-      const response = await fetch(`/api/project-steps/${id}`, {
+      const response = await fetch(`/api/steps/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(updates),
       });
-      if (!response.ok) throw new Error('Failed to update step');
-      await fetchProjects();
+
+      if (response.ok) {
+        const updatedStep = await response.json();
+        setState(prev => ({
+          ...prev,
+          steps: prev.steps.map((s) => (s.id === id ? updatedStep : s)),
+        }));
+      } else {
+        throw new Error('Failed to update step');
+      }
     } catch (error) {
-      console.error('[v0] Update step error:', error);
+      console.error('Update step error:', error);
       throw error;
     }
   };
 
   const deleteStep = async (id: string) => {
-    if (state.currentUser?.role !== 'admin') return;
+    if (!user || user.role !== 'admin') return;
+
     try {
-      const response = await fetch(`/api/project-steps/${id}`, {
+      const response = await fetch(`/api/steps/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to delete step');
-      await fetchProjects();
+
+      if (response.ok) {
+        setState(prev => ({
+          ...prev,
+          steps: prev.steps.filter((s) => s.id !== id),
+          expenses: prev.expenses.filter((e) => e.stepId !== id),
+        }));
+      } else {
+        throw new Error('Failed to delete step');
+      }
     } catch (error) {
-      console.error('[v0] Delete step error:', error);
+      console.error('Delete step error:', error);
       throw error;
     }
   };
@@ -188,14 +236,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/money-in', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(money),
       });
-      if (!response.ok) throw new Error('Failed to add money in');
-      await fetchProjects();
+
+      if (response.ok) {
+        const newMoneyIn = await response.json();
+        setState(prev => ({
+          ...prev,
+          moneyIn: [...prev.moneyIn, newMoneyIn],
+        }));
+      } else {
+        throw new Error('Failed to add money-in');
+      }
     } catch (error) {
-      console.error('[v0] Add money in error:', error);
+      console.error('Add money-in error:', error);
       throw error;
     }
   };
@@ -204,29 +261,45 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/money-in/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(updates),
       });
-      if (!response.ok) throw new Error('Failed to update money in');
-      await fetchProjects();
+
+      if (response.ok) {
+        const updatedMoneyIn = await response.json();
+        setState(prev => ({
+          ...prev,
+          moneyIn: prev.moneyIn.map((m) => (m.id === id ? updatedMoneyIn : m)),
+        }));
+      } else {
+        throw new Error('Failed to update money-in');
+      }
     } catch (error) {
-      console.error('[v0] Update money in error:', error);
+      console.error('Update money-in error:', error);
       throw error;
     }
   };
 
   const deleteMoneyIn = async (id: string) => {
-    if (state.currentUser?.role !== 'admin') return;
+    if (!user || user.role !== 'admin') return;
+
     try {
       const response = await fetch(`/api/money-in/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to delete money in');
-      await fetchProjects();
+
+      if (response.ok) {
+        setState(prev => ({
+          ...prev,
+          moneyIn: prev.moneyIn.filter((m) => m.id !== id),
+        }));
+      } else {
+        throw new Error('Failed to delete money-in');
+      }
     } catch (error) {
-      console.error('[v0] Delete money in error:', error);
+      console.error('Delete money-in error:', error);
       throw error;
     }
   };
@@ -235,97 +308,103 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/expenses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(expense),
       });
-      if (!response.ok) throw new Error('Failed to add expense');
-      await fetchProjects();
+
+      if (response.ok) {
+        const newExpense = await response.json();
+        setState(prev => ({
+          ...prev,
+          expenses: [...prev.expenses, newExpense],
+        }));
+      } else {
+        throw new Error('Failed to add expense');
+      }
     } catch (error) {
-      console.error('[v0] Add expense error:', error);
+      console.error('Add expense error:', error);
       throw error;
     }
   };
 
   const updateExpense = async (id: string, updates: Partial<Expense>) => {
-    if (state.currentUser?.role === 'supervisor') return;
+    if (user?.role === 'supervisor') return;
+
     try {
       const response = await fetch(`/api/expenses/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(updates),
       });
-      if (!response.ok) throw new Error('Failed to update expense');
-      await fetchProjects();
+
+      if (response.ok) {
+        const updatedExpense = await response.json();
+        setState(prev => ({
+          ...prev,
+          expenses: prev.expenses.map((e) => (e.id === id ? updatedExpense : e)),
+        }));
+      } else {
+        throw new Error('Failed to update expense');
+      }
     } catch (error) {
-      console.error('[v0] Update expense error:', error);
+      console.error('Update expense error:', error);
       throw error;
     }
   };
 
   const deleteExpense = async (id: string) => {
-    if (state.currentUser?.role !== 'admin') return;
+    if (!user || user.role !== 'admin') return;
+
     try {
       const response = await fetch(`/api/expenses/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to delete expense');
-      await fetchProjects();
+
+      if (response.ok) {
+        setState(prev => ({
+          ...prev,
+          expenses: prev.expenses.filter((e) => e.id !== id),
+        }));
+      } else {
+        throw new Error('Failed to delete expense');
+      }
     } catch (error) {
-      console.error('[v0] Delete expense error:', error);
+      console.error('Delete expense error:', error);
       throw error;
     }
   };
 
-  const createUser = async (user: Omit<User, 'id' | 'companyId'>) => {
+  const createUser = (user: Omit<User, 'id' | 'companyId'>) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(user),
-      });
-      if (!response.ok) throw new Error('Failed to create user');
-      await fetchUsers();
-    } catch (error) {
-      console.error('[v0] Create user error:', error);
-      throw error;
-    }
+    const newUser: User = {
+      ...user,
+      id: `user_${Date.now()}`,
+      companyId: state.currentUser.companyId,
+    };
+    saveAndUpdate({
+      ...state,
+      users: [...state.users, newUser],
+    });
   };
 
-  const updateUser = async (id: string, updates: Partial<User>) => {
+  const updateUser = (id: string, updates: Partial<User>) => {
     if (state.currentUser?.role !== 'admin') return;
-    try {
-      const response = await fetch('/api/users', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userId: id, ...updates }),
-      });
-      if (!response.ok) throw new Error('Failed to update user');
-      await fetchUsers();
-    } catch (error) {
-      console.error('[v0] Update user error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      users: state.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
+    });
   };
 
-  const deleteUser = async (id: string) => {
+  const deleteUser = (id: string) => {
     if (state.currentUser?.role !== 'admin' || id === state.currentUser.id) return;
-    try {
-      const response = await fetch(`/api/users?userId=${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to delete user');
-      await fetchUsers();
-    } catch (error) {
-      console.error('[v0] Delete user error:', error);
-      throw error;
-    }
+    saveAndUpdate({
+      ...state,
+      users: state.users.filter((u) => u.id !== id),
+    });
   };
 
   const exportProjectToExcel = (projectId: string) => {
@@ -398,7 +477,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider
       value={{
         state,
-        isLoading,
         createProject,
         updateProject,
         deleteProject,
@@ -415,8 +493,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateUser,
         deleteUser,
         exportProjectToExcel,
-        fetchProjects,
-        fetchUsers,
       }}
     >
       {children}
