@@ -81,11 +81,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate unique expense ID
+    const expenseId = `expense_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const result = await execute(
       `INSERT INTO expenses (
-        project_id, step_id, date, description, category, vendor, receipt, amount
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, project_id, step_id, date, description, category, vendor, receipt, amount, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        expenseId,
         projectId,
         stepId || null,
         date,
@@ -93,11 +97,10 @@ export async function POST(request: NextRequest) {
         category || '',
         vendor || '',
         receipt || '',
-        amount
+        amount,
+        session.user.id
       ]
     );
-
-    const expenseId = (result as any).insertId;
 
     // Get the created expense
     const expense = await queryOne<any>(

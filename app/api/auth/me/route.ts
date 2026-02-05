@@ -1,48 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
-import { queryOne } from '@/lib/db';
+import { getServerSession } from '@/lib/auth';
+import { snakeToCamel } from '@/lib/transform';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const token = request.cookies.get('authToken')?.value;
+    const session = await getServerSession();
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No token provided' },
-        { status: 401 }
-      );
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-
-    const user = await queryOne<any>(
-      'SELECT id, name, email, role, company_id FROM users WHERE id = ?',
-      [decoded.id]
-    );
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        companyId: user.company_id,
-      },
-    });
+    return NextResponse.json(snakeToCamel(session.user));
   } catch (error) {
-    console.error('[v0] Auth check error:', error);
+    console.error('Get me error:', error);
     return NextResponse.json(
-      { error: 'Invalid token' },
-      { status: 401 }
+      { error: 'Internal server error' },
+      { status: 500 }
     );
   }
 }

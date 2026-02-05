@@ -1,10 +1,8 @@
-import React from "react"
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-import { AuthProvider } from '@/lib/auth-context'
-import { DataProvider } from '@/lib/data-context'
+import { ClientLayout } from '@/components/ClientLayout'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -39,14 +37,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-sans antialiased`}>
-        <AuthProvider>
-          <DataProvider>
-            {children}
-            <Analytics />
-          </DataProvider>
-        </AuthProvider>
+      <body className={`font-sans antialiased`} suppressHydrationWarning={true}>
+        <ClientLayout>
+          {children}
+          <Analytics />
+        </ClientLayout>
       </body>
     </html>
   )
 }
+
+

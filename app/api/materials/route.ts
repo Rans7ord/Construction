@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute } from '@/lib/db';
-import { v4 as uuidv4 } from 'uuid';
+import { getServerSession } from '@/lib/auth';
+import { snakeToCamel } from '@/lib/transform';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { projectId, stepId, name, type, quantity, unit, description } = body;
 
@@ -14,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const id = uuidv4();
+    const id = `material_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     await execute(
       `INSERT INTO materials (id, project_id, step_id, name, type, quantity, unit, description) 
@@ -37,29 +43,34 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const projectId = request.nextUrl.searchParams.get('projectId');
     const stepId = request.nextUrl.searchParams.get('stepId');
 
-    let sql = 'SELECT * FROM materials WHERE 1=1';
-    const params: any[] = [];
+    let sql = 'SELECT m.* FROM materials m JOIN projects p ON m.project_id = p.id WHERE p.company_id = ?';
+    const params: any[] = [session.user.companyId];
 
     if (projectId) {
-      sql += ' AND project_id = ?';
+      sql += ' AND m.project_id = ?';
       params.push(projectId);
     }
 
     if (stepId) {
-      sql += ' AND step_id = ?';
+      sql += ' AND m.step_id = ?';
       params.push(stepId);
     }
 
-    sql += ' ORDER BY created_at DESC';
+    sql += ' ORDER BY m.created_at DESC';
 
     const materials = await query(sql, params);
 
-    return NextResponse.json(materials);
+    return NextResponse.json(snakeToCamel(materials));
   } catch (error) {
-    console.error('[v0] Get materials error:', error);
+    console.error('Get materials error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

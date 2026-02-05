@@ -53,12 +53,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate unique project ID
+    const projectId = `proj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const result = await execute(
       `INSERT INTO projects (
-        name, location, description, client_name, client_email,
+        id, name, location, description, client_name, client_email,
         start_date, end_date, total_budget, created_by, company_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        projectId,
         name,
         location,
         description || '',
@@ -72,8 +76,6 @@ export async function POST(request: NextRequest) {
         status
       ]
     );
-
-    const projectId = (result as any).insertId;
 
     // Get the created project
     const project = await queryOne<any>(

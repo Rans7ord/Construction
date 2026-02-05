@@ -45,11 +45,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate unique money-in ID
+    const moneyInId = `money_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const result = await execute(
       `INSERT INTO money_in (
-        project_id, amount, description, reference, date
-      ) VALUES (?, ?, ?, ?, ?)`,
+        id, project_id, amount, description, reference, date
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
       [
+        moneyInId,
         projectId,
         amount,
         description,
@@ -57,8 +61,6 @@ export async function POST(request: NextRequest) {
         date
       ]
     );
-
-    const moneyInId = (result as any).insertId;
 
     // Get the created money-in
     const moneyIn = await query<any>(

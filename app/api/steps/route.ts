@@ -9,7 +9,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const steps = await query<any>('SELECT * FROM project_steps ORDER BY project_id, `order`');
+    const steps = await query<any>(
+      'SELECT ps.* FROM project_steps ps JOIN projects p ON ps.project_id = p.id WHERE p.company_id = ? ORDER BY ps.project_id, ps.`order`',
+      [session.user.companyId]
+    );
 
     return NextResponse.json(steps);
   } catch (error) {
@@ -46,11 +49,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate unique step ID
+    const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const result = await query(
       `INSERT INTO project_steps (
-        project_id, name, description, estimated_budget, status, \`order\`
-      ) VALUES (?, ?, ?, ?, ?, ?)`,
+        id, project_id, name, description, estimated_budget, status, \`order\`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
+        stepId,
         projectId,
         name,
         description || '',
@@ -59,8 +66,6 @@ export async function POST(request: NextRequest) {
         order || 0
       ]
     );
-
-    const stepId = (result as any).insertId;
 
     // Get the created step
     const step = await query<any>(

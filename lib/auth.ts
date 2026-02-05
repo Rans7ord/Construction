@@ -15,10 +15,11 @@ export interface AuthUser {
 export async function getServerSession(): Promise<{ user: AuthUser } | null> {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
+    const token = cookieStore.get('authToken')?.value;
     if (!token) return null;
 
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    console.log('Decoded token:', decoded);
     return { user: decoded };
   } catch (error) {
     console.error('Token verification failed:', error);
