@@ -38,13 +38,26 @@ export default function ReportsPage() {
     ? state.moneyIn.filter((m) => m.projectId === selectedProject.id)
     : state.moneyIn;
 
+  // ✅ FIX: Ensure proper number parsing
   const totalBudget = selectedProject
-    ? selectedProject.totalBudget
-    : projects.reduce((sum, p) => sum + p.totalBudget, 0);
+    ? Number(selectedProject.totalBudget || selectedProject.total_budget || 0)
+    : projects.reduce((sum, p) => sum + Number(p.totalBudget || p.total_budget || 0), 0);
 
-  const totalSpent = projectExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + m.amount, 0);
+  const totalSpent = projectExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + Number(m.amount || 0), 0);
   const remaining = totalBudget - totalSpent;
+
+  // ✅ FIX: Add NaN check for formatting
+  const formatAmount = (amount: number) => {
+    if (isNaN(amount)) return '$0.0K';
+    if (amount >= 1000000) {
+      return `$${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 1000) {
+      return `$${(amount / 1000).toFixed(1)}K`;
+    } else {
+      return `$${amount.toLocaleString()}`;
+    }
+  };
 
   const generatePDF = () => {
     let content = 'BuildManager - Project Report\n';
@@ -64,20 +77,22 @@ export default function ReportsPage() {
     content += `Total Income: $${totalIncome.toLocaleString()}\n`;
     content += `Total Expenses: $${totalSpent.toLocaleString()}\n`;
     content += `Remaining: $${remaining.toLocaleString()}\n`;
-    content += `Budget Usage: ${((totalSpent / totalBudget) * 100).toFixed(2)}%\n\n`;
+    content += `Budget Usage: ${totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(2) : 0}%\n\n`;
 
     if (selectedProject) {
       content += 'BREAKDOWN BY STEPS\n';
       projectSteps.forEach((step) => {
         const stepExpenses = projectExpenses.filter((e) => e.stepId === step.id);
-        const stepTotal = stepExpenses.reduce((sum, e) => sum + e.amount, 0);
+        const stepTotal = stepExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+        const stepBudget = Number(step.estimatedBudget || step.estimated_budget || 0);
+        
         content += `\n${step.name}\n`;
-        content += `Estimated Budget: $${step.estimatedBudget.toLocaleString()}\n`;
+        content += `Estimated Budget: $${stepBudget.toLocaleString()}\n`;
         content += `Actual Expenses: $${stepTotal.toLocaleString()}\n`;
         content += `Status: ${step.status}\n`;
 
         stepExpenses.forEach((exp) => {
-          content += `  - ${exp.description}: $${exp.amount.toLocaleString()} (${exp.category})\n`;
+          content += `  - ${exp.description}: $${Number(exp.amount || 0).toLocaleString()} (${exp.category})\n`;
         });
       });
     }
@@ -87,7 +102,7 @@ export default function ReportsPage() {
       const step = projectSteps.find((s) => s.id === expense.stepId);
       content += `${expense.date} - ${expense.description}\n`;
       content += `  Step: ${step?.name || 'Unknown'}\n`;
-      content += `  Amount: $${expense.amount.toLocaleString()}\n`;
+      content += `  Amount: $${Number(expense.amount || 0).toLocaleString()}\n`;
       content += `  Vendor: ${expense.vendor}\n`;
       content += `  Category: ${expense.category}\n`;
       content += `  Receipt: ${expense.receipt}\n\n`;
@@ -186,7 +201,7 @@ export default function ReportsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Budget</p>
-                  <p className="text-3xl font-bold">${(totalBudget / 1000).toFixed(1)}K</p>
+                  <p className="text-3xl font-bold">{formatAmount(totalBudget)}</p>
                 </div>
                 <DollarSign className="w-8 h-8 text-primary opacity-50" />
               </div>
@@ -197,7 +212,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Income</p>
                   <p className="text-3xl font-bold text-green-600">
-                    ${(totalIncome / 1000).toFixed(1)}K
+                    {formatAmount(totalIncome)}
                   </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-green-600 opacity-50" />
@@ -209,7 +224,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Expenses</p>
                   <p className="text-3xl font-bold text-orange-600">
-                    ${(totalSpent / 1000).toFixed(1)}K
+                    {formatAmount(totalSpent)}
                   </p>
                 </div>
                 <TrendingDown className="w-8 h-8 text-orange-600 opacity-50" />
@@ -223,7 +238,7 @@ export default function ReportsPage() {
                   <p
                     className={`text-3xl font-bold ${remaining >= 0 ? 'text-blue-600' : 'text-destructive'}`}
                   >
-                    ${(remaining / 1000).toFixed(1)}K
+                    {formatAmount(remaining)}
                   </p>
                 </div>
                 <DollarSign className={`w-8 h-8 opacity-50 ${remaining >= 0 ? 'text-blue-600' : 'text-destructive'}`} />
@@ -239,13 +254,13 @@ export default function ReportsPage() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">Overall Progress</span>
                   <span className="text-sm font-semibold">
-                    {((totalSpent / totalBudget) * 100).toFixed(1)}%
+                    {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}%
                   </span>
                 </div>
                 <div className="h-6 bg-border rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-primary to-accent transition-all"
-                    style={{ width: `${Math.min((totalSpent / totalBudget) * 100, 100)}%` }}
+                    style={{ width: `${totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0}%` }}
                   ></div>
                 </div>
               </div>
@@ -264,8 +279,9 @@ export default function ReportsPage() {
                   .sort((a, b) => a.order - b.order)
                   .map((step) => {
                     const stepExpenses = projectExpenses.filter((e) => e.stepId === step.id);
-                    const stepTotal = stepExpenses.reduce((sum, e) => sum + e.amount, 0);
-                    const stepPercentage = (stepTotal / step.estimatedBudget) * 100;
+                    const stepTotal = stepExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+                    const stepBudget = Number(step.estimatedBudget || step.estimated_budget || 0);
+                    const stepPercentage = stepBudget > 0 ? (stepTotal / stepBudget) * 100 : 0;
 
                     return (
                       <div key={step.id} className="p-4 bg-muted/30 rounded-lg">
@@ -278,7 +294,7 @@ export default function ReportsPage() {
                           </div>
                           <div className="text-right">
                             <p className="font-semibold">
-                              ${(stepTotal / 1000).toFixed(1)}K / ${(step.estimatedBudget / 1000).toFixed(1)}K
+                              {formatAmount(stepTotal)} / {formatAmount(stepBudget)}
                             </p>
                             <p className={`text-sm ${stepPercentage <= 100 ? 'text-green-600' : 'text-destructive'}`}>
                               {stepPercentage.toFixed(1)}%

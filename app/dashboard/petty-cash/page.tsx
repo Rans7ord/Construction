@@ -181,7 +181,7 @@ export default function PettyCashPage() {
           `"${t.description.replace(/"/g, '""')}"`,
           t.category ? `"${t.category.replace(/"/g, '""')}"` : '',
           t.vendor ? `"${t.vendor.replace(/"/g, '""')}"` : '',
-          t.amount.toFixed(2),
+          Number(t.amount).toFixed(2),
           `"${t.added_by_name.replace(/"/g, '""')}"`,
         ].join(','))
       ].join('\n');
@@ -212,9 +212,9 @@ export default function PettyCashPage() {
     try {
       // Simple text-based PDF export for now
       const content = `Petty Cash Report - ${new Date().toLocaleDateString()}\n\n`;
-      const summary = `Balance: $${data.balance.toFixed(2)}\nInflows: $${data.inflows.toFixed(2)}\nOutflows: $${data.outflows.toFixed(2)}\n\n`;
+      const summary = `Balance: $${Number(data.balance).toFixed(2)}\nInflows: $${Number(data.inflows).toFixed(2)}\nOutflows: $${Number(data.outflows).toFixed(2)}\n\n`;
       const transactions = data.transactions.map(t =>
-        `${t.date} - ${t.type.toUpperCase()} - ${t.description} - $${t.amount.toFixed(2)} - ${t.added_by_name}`
+        `${t.date} - ${t.type.toUpperCase()} - ${t.description} - $${Number(t.amount).toFixed(2)} - ${t.added_by_name}`
       ).join('\n');
 
       const fullContent = content + summary + 'Transactions:\n' + transactions;
@@ -295,7 +295,7 @@ export default function PettyCashPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Current Balance</p>
                   <p className={`text-3xl font-bold ${data.balance >= 0 ? 'text-green-600' : 'text-destructive'}`}>
-                    ${data.balance.toFixed(2)}
+                    ${Number(data.balance).toFixed(2)}
                   </p>
                 </div>
                 <Wallet className={`w-8 h-8 opacity-50 ${data.balance >= 0 ? 'text-green-600' : 'text-destructive'}`} />
@@ -307,7 +307,7 @@ export default function PettyCashPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Inflows</p>
                   <p className="text-3xl font-bold text-green-600">
-                    ${data.inflows.toFixed(2)}
+                    ${Number(data.inflows).toFixed(2)}
                   </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-green-600 opacity-50" />
@@ -319,7 +319,7 @@ export default function PettyCashPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Outflows</p>
                   <p className="text-3xl font-bold text-orange-600">
-                    ${data.outflows.toFixed(2)}
+                    ${Number(data.outflows).toFixed(2)}
                   </p>
                 </div>
                 <TrendingDown className="w-8 h-8 text-orange-600 opacity-50" />
@@ -548,7 +548,7 @@ export default function PettyCashPage() {
                         <TableCell className={`text-right font-medium ${
                           transaction.type === 'inflow' ? 'text-green-600' : 'text-orange-600'
                         }`}>
-                          {transaction.type === 'inflow' ? '+' : '-'}${parseFloat(transaction.amount).toFixed(2)}
+                          {transaction.type === 'inflow' ? '+' : '-'}${Number(transaction.amount).toFixed(2)}
                         </TableCell>
                         <TableCell>{transaction.added_by_name}</TableCell>
                       </TableRow>

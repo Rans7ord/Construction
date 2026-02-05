@@ -22,7 +22,9 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
   const { user } = useAuth();
   const { deleteProject } = useData();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const spentPercentage = (stats.totalExpenses / project.totalBudget) * 100;
+  const totalExpenses = Number(stats.totalExpenses);
+  const totalBudget = Number(project.totalBudget);
+  const spentPercentage = (totalExpenses / totalBudget) * 100;
 
   const handleDelete = () => {
     deleteProject(project.id);
@@ -78,13 +80,13 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
             <div>
               <p className="text-muted-foreground">Budget</p>
               <p className="font-semibold text-foreground">
-                ₵{(project.totalBudget / 1000).toFixed(1)}K
+                ₵{(Number(project.totalBudget) / 1000).toFixed(1)}K
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Spent</p>
               <p className="font-semibold text-foreground">
-                ₵{(stats.totalExpenses / 1000).toFixed(1)}K
+                ₵{(Number(stats.totalExpenses) / 1000).toFixed(1)}K
               </p>
             </div>
           </div>

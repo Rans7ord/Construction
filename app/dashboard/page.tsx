@@ -26,9 +26,23 @@ export default function DashboardPage() {
   if (!mounted) return null;
 
   const projects = state.projects;
-  const totalBudget = projects.reduce((sum, p) => sum + p.totalBudget, 0);
-  const totalSpent = state.expenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalIncome = state.moneyIn.reduce((sum, m) => sum + m.amount, 0);
+  
+  // ✅ FIX: Handle both snake_case and camelCase, ensure proper number parsing
+  const totalBudget = projects.reduce((sum, p) => {
+    const budget = Number(p.totalBudget || p.total_budget || 0);
+    return sum + budget;
+  }, 0);
+  
+  const totalSpent = state.expenses.reduce((sum, e) => {
+    const amount = Number(e.amount || 0);
+    return sum + amount;
+  }, 0);
+  
+  const totalIncome = state.moneyIn.reduce((sum, m) => {
+    const amount = Number(m.amount || 0);
+    return sum + amount;
+  }, 0);
+  
   const remaining = totalBudget - totalSpent;
   const profit = totalIncome * 0.1; // 10% profit
 
@@ -113,7 +127,7 @@ export default function DashboardPage() {
                       stats={{
                         totalExpenses: state.expenses
                           .filter((e) => e.projectId === project.id)
-                          .reduce((sum, e) => sum + e.amount, 0),
+                          .reduce((sum, e) => sum + Number(e.amount || 0), 0),
                         stepCount: state.steps.filter((s) => s.projectId === project.id).length,
                       }}
                     />

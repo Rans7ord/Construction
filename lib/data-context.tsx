@@ -460,7 +460,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     csvContent += `Status,${project.status}\n`;
     csvContent += `Start Date,${project.startDate}\n`;
     csvContent += `End Date,${project.endDate}\n`;
-    csvContent += `Total Budget,₵${project.totalBudget.toLocaleString()}\n\n`;
+    csvContent += `Total Budget,₵${parseFloat(project.totalBudget as string).toLocaleString()}\n\n`;
 
     // Money In
     csvContent += `MONEY IN / INCOME\n`;
@@ -495,8 +495,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     csvContent += `Total Budget,₵${project.totalBudget.toLocaleString()}\n`;
     csvContent += `Total Income,₵${totalIncome.toLocaleString()}\n`;
     csvContent += `Total Expenses,₵${totalExpenses.toLocaleString()}\n`;
-    csvContent += `Remaining,₵${(project.totalBudget - totalExpenses).toLocaleString()}\n`;
-    csvContent += `Budget Utilization,${((totalExpenses / project.totalBudget) * 100).toFixed(2)}%\n`;
+    const budget = parseFloat(project.totalBudget as string);
+    csvContent += `Remaining,₵${(budget - totalExpenses).toLocaleString()}\n`;
+    csvContent += `Budget Utilization,${((totalExpenses / budget) * 100).toFixed(2)}%\n`;
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');

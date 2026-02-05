@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, queryOne } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
+import { snakeToCamel } from '@/lib/transform';
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
       [session.user.companyId]
     );
 
-    return NextResponse.json(projects);
+    return NextResponse.json(snakeToCamel(projects));
   } catch (error) {
     console.error('Get projects error:', error);
     return NextResponse.json(

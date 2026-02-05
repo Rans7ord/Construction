@@ -47,14 +47,15 @@ export default function ProjectDetailPage() {
     );
   }
 
-  // Convert budget to number and ensure it's valid
-  const totalBudget = Number(project.totalBudget) || 0;
-  const totalSpent = projectExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+  // ✅ FIX: Ensure proper number parsing from both snake_case and camelCase
+  const totalBudget = Number(project.totalBudget || project.total_budget || 0);
+  const totalSpent = projectExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + Number(m.amount || 0), 0);
   const remaining = totalBudget - totalSpent;
   const percentageSpent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
   const formatAmount = (amount: number) => {
+    if (isNaN(amount)) return '₵0.0K';
     if (amount >= 1000000) {
       return `₵${(amount / 1000000).toFixed(2)}M`;
     } else if (amount >= 1000) {
