@@ -57,9 +57,9 @@ export async function verifyPassword(email: string, password: string) {
     'SELECT id, name, email, password, role, company_id FROM users WHERE email = ?',
     [email]
   );
-  
+
   if (!user) return null;
-  
+
   // This requires bcrypt package - will be handled in auth middleware
   return user;
 }
