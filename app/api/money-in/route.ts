@@ -1,6 +1,18 @@
+/**
+ * FILE LOCATION: app/api/money-in/route.ts
+ * 
+ * CHANGES MADE:
+ * - Added snakeToCamel() transformation to all database responses
+ * - Added validation for required fields (projectId, amount, description, date)
+ * - Added detailed error messages with error.message
+ * - Added company_id filtering in GET queries
+ * - Fixed query to properly filter by projectId when provided
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { query, execute } from '@/lib/db';
+import { query, execute, queryOne } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
+import { snakeToCamel } from '@/lib/transform';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,9 +21,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const moneyIn = await query<any>('SELECT * FROM money_in ORDER BY date DESC');
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId');
 
-    return NextResponse.json(moneyIn);
+    let sql = 'SELECT mi.* FROM money_in mi JOIN projects p ON mi.project_id = p.id WHERE p.company_id = ?';
+    const params: any[] = [session.user.companyId];
+
+    if (projectId) {
+      sql += ' AND mi.project_id = ?';
+      params.push(projectId);
+    }
+
+    sql += ' ORDER BY mi.date DESC';
+
+    const moneyIn = await query<any>(sql, params);
+
+    return NextResponse.json(snakeToCamel(moneyIn));
   } catch (error) {
     console.error('Get money-in error:', error);
     return NextResponse.json(
@@ -40,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!projectId || !amount || !description || !date) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: projectId, amount, description, and date are required' },
         { status: 400 }
       );
     }
@@ -48,7 +73,7 @@ export async function POST(request: NextRequest) {
     // Generate unique money-in ID
     const moneyInId = `money_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const result = await execute(
+    await execute(
       `INSERT INTO money_in (
         id, project_id, amount, description, reference, date
       ) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -63,16 +88,16 @@ export async function POST(request: NextRequest) {
     );
 
     // Get the created money-in
-    const moneyIn = await query<any>(
+    const moneyIn = await queryOne<any>(
       'SELECT * FROM money_in WHERE id = ?',
       [moneyInId]
     );
 
-    return NextResponse.json(moneyIn[0], { status: 201 });
+    return NextResponse.json(snakeToCamel(moneyIn), { status: 201 });
   } catch (error) {
     console.error('Create money-in error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
     );
   }

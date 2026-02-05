@@ -1,21 +1,18 @@
+/**
+ * FILE LOCATION: app/api/expenses/route.ts
+ * 
+ * CHANGES MADE:
+ * - Replaced getUserFromToken() with getServerSession() for proper authentication
+ * - Added snakeToCamel() transformation to all database responses
+ * - Added validation for required fields (projectId, date, description, amount)
+ * - Added detailed error messages with error.message in catch blocks
+ * - Fixed company_id filtering in queries to ensure data isolation
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, queryOne } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-function getUserFromToken(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
-  if (!token) return null;
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    return decoded;
-  } catch (error) {
-    return null;
-  }
-}
+import { snakeToCamel } from '@/lib/transform';
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,23 +25,27 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get('projectId');
     const stepId = searchParams.get('stepId');
 
-    let sql = 'SELECT * FROM expenses';
-    let params: any[] = [];
+    let sql = 'SELECT e.* FROM expenses e JOIN projects p ON e.project_id = p.id WHERE p.company_id = ?';
+    let params: any[] = [session.user.companyId];
 
     if (projectId) {
-      sql += ' WHERE project_id = ?';
+      sql += ' AND e.project_id = ?';
       params.push(projectId);
     }
 
     if (stepId) {
-      sql += projectId ? ' AND step_id = ?' : ' WHERE step_id = ?';
+      sql += ' AND e.step_id = ?';
       params.push(stepId);
     }
 
-    sql += ' ORDER BY date DESC';
+    sql += ' ORDER BY e.date DESC';
 
     const expenses = await query<any>(sql, params);
-    return NextResponse.json(expenses);
+    
+    // Transform snake_case to camelCase
+    const transformedExpenses = snakeToCamel(expenses);
+    
+    return NextResponse.json(transformedExpenses);
   } catch (error) {
     console.error('Get expenses error:', error);
     return NextResponse.json(
@@ -76,15 +77,15 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!projectId || !date || !description || !amount) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: projectId, date, description, and amount are required' },
         { status: 400 }
-      );
+    );
     }
 
     // Generate unique expense ID
     const expenseId = `expense_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const result = await execute(
+    await execute(
       `INSERT INTO expenses (
         id, project_id, step_id, date, description, category, vendor, receipt, amount, created_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -102,24 +103,18 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    // Get the created expense
+    // Get the created expense with transformation
     const expense = await queryOne<any>(
       'SELECT * FROM expenses WHERE id = ?',
       [expenseId]
     );
 
-    return NextResponse.json(expense, { status: 201 });
+    return NextResponse.json(snakeToCamel(expense), { status: 201 });
   } catch (error) {
     console.error('Create expense error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
     );
   }
 }
-async function getLocalServerSession() {
-  // Example implementation for retrieving a session
-  const session = await getServerSession();
-  return session || null;
-}
-

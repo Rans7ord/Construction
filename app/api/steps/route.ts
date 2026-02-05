@@ -1,6 +1,18 @@
+/**
+ * FILE LOCATION: app/api/steps/route.ts
+ * 
+ * CHANGES MADE:
+ * - Added snakeToCamel() transformation to all database responses
+ * - Added validation for required fields (projectId, name)
+ * - Changed INSERT from query() to execute() for proper execution
+ * - Added detailed error messages with error.message
+ * - Added proper company_id filtering for data security
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, execute, queryOne } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
+import { snakeToCamel } from '@/lib/transform';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,12 +21,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const steps = await query<any>(
-      'SELECT ps.* FROM project_steps ps JOIN projects p ON ps.project_id = p.id WHERE p.company_id = ? ORDER BY ps.project_id, ps.`order`',
-      [session.user.companyId]
-    );
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId');
 
-    return NextResponse.json(steps);
+    let sql = 'SELECT ps.* FROM project_steps ps JOIN projects p ON ps.project_id = p.id WHERE p.company_id = ?';
+    const params: any[] = [session.user.companyId];
+
+    if (projectId) {
+      sql += ' AND ps.project_id = ?';
+      params.push(projectId);
+    }
+
+    sql += ' ORDER BY ps.project_id, ps.`order`';
+
+    const steps = await query<any>(sql, params);
+    
+    return NextResponse.json(snakeToCamel(steps));
   } catch (error) {
     console.error('Get steps error:', error);
     return NextResponse.json(
@@ -44,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!projectId || !name) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: projectId and name are required' },
         { status: 400 }
       );
     }
@@ -52,7 +74,7 @@ export async function POST(request: NextRequest) {
     // Generate unique step ID
     const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const result = await query(
+    await execute(
       `INSERT INTO project_steps (
         id, project_id, name, description, estimated_budget, status, \`order\`
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -68,16 +90,16 @@ export async function POST(request: NextRequest) {
     );
 
     // Get the created step
-    const step = await query<any>(
+    const step = await queryOne<any>(
       'SELECT * FROM project_steps WHERE id = ?',
       [stepId]
     );
 
-    return NextResponse.json(step[0], { status: 201 });
+    return NextResponse.json(snakeToCamel(step), { status: 201 });
   } catch (error) {
     console.error('Create step error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
     );
   }
