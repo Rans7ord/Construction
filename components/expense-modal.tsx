@@ -9,6 +9,9 @@ import { useAuth } from '@/lib/auth-context';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { X } from 'lucide-react';
+import { formatDateForInput } from '@/lib/date-utils';
+
+// Use for default date value
 
 interface ExpenseModalProps {
   open: boolean;
@@ -49,7 +52,7 @@ export function ExpenseModal({
         stepId: expense.stepId,
       });
     } else {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateForInput(new Date());
       setFormData({
         amount: '',
         description: '',

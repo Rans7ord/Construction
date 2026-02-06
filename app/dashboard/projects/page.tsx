@@ -11,6 +11,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { ProjectCard } from '@/components/project-card';
 import { Plus, ArrowLeft } from 'lucide-react';
 
+
 export default function ProjectsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -76,13 +77,13 @@ export default function ProjectsPage() {
               <Card className="p-6 border-border/50">
                 <p className="text-sm text-muted-foreground mb-2">Total Budget</p>
                 <p className="text-3xl font-bold text-foreground">
-                  ${(projects.reduce((sum, p) => sum + p.totalBudget, 0) / 1000000).toFixed(1)}M
+                  ₵{(projects.reduce((sum, p) => sum + p.totalBudget, 0) / 1000000).toFixed(1)}M
                 </p>
               </Card>
               <Card className="p-6 border-border/50">
                 <p className="text-sm text-muted-foreground mb-2">Total Spent</p>
                 <p className="text-3xl font-bold text-orange-600">
-                  ${(state.expenses.reduce((sum, e) => sum + e.amount, 0) / 1000000).toFixed(1)}M
+                  ₵{(state.expenses.reduce((sum, e) => sum + e.amount, 0) / 1000000).toFixed(1)}M
                 </p>
               </Card>
             </div>

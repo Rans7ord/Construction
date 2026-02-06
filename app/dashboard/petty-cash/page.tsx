@@ -10,6 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { formatDate } from '@/lib/date-utils';
+
+// Use when displaying transaction dates in the table
 import {
   Select,
   SelectContent,
@@ -212,9 +215,9 @@ export default function PettyCashPage() {
     try {
       // Simple text-based PDF export for now
       const content = `Petty Cash Report - ${new Date().toLocaleDateString()}\n\n`;
-      const summary = `Balance: $${Number(data.balance).toFixed(2)}\nInflows: $${Number(data.inflows).toFixed(2)}\nOutflows: $${Number(data.outflows).toFixed(2)}\n\n`;
+      const summary = `Balance: ₵${Number(data.balance).toFixed(2)}\nInflows: ₵${Number(data.inflows).toFixed(2)}\nOutflows: ₵${Number(data.outflows).toFixed(2)}\n\n`;
       const transactions = data.transactions.map(t =>
-        `${t.date} - ${t.type.toUpperCase()} - ${t.description} - $${Number(t.amount).toFixed(2)} - ${t.added_by_name}`
+        `${t.date} - ${t.type.toUpperCase()} - ${t.description} - ₵${Number(t.amount).toFixed(2)} - ${t.added_by_name}`
       ).join('\n');
 
       const fullContent = content + summary + 'Transactions:\n' + transactions;
@@ -295,7 +298,7 @@ export default function PettyCashPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Current Balance</p>
                   <p className={`text-3xl font-bold ${data.balance >= 0 ? 'text-green-600' : 'text-destructive'}`}>
-                    ${Number(data.balance).toFixed(2)}
+                    ₵{Number(data.balance).toFixed(2)}
                   </p>
                 </div>
                 <Wallet className={`w-8 h-8 opacity-50 ${data.balance >= 0 ? 'text-green-600' : 'text-destructive'}`} />
@@ -307,7 +310,7 @@ export default function PettyCashPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Inflows</p>
                   <p className="text-3xl font-bold text-green-600">
-                    ${Number(data.inflows).toFixed(2)}
+                    ₵{Number(data.inflows).toFixed(2)}
                   </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-green-600 opacity-50" />
@@ -319,7 +322,7 @@ export default function PettyCashPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Outflows</p>
                   <p className="text-3xl font-bold text-orange-600">
-                    ${Number(data.outflows).toFixed(2)}
+                    ₵{Number(data.outflows).toFixed(2)}
                   </p>
                 </div>
                 <TrendingDown className="w-8 h-8 text-orange-600 opacity-50" />
@@ -527,11 +530,7 @@ export default function PettyCashPage() {
                     {data.transactions.map((transaction) => (
                       <TableRow key={transaction.id} className="hover:bg-muted/50">
                         <TableCell>
-                          {new Date(transaction.date).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {formatDate(transaction.date)}
                         </TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -548,7 +547,7 @@ export default function PettyCashPage() {
                         <TableCell className={`text-right font-medium ${
                           transaction.type === 'inflow' ? 'text-green-600' : 'text-orange-600'
                         }`}>
-                          {transaction.type === 'inflow' ? '+' : '-'}${Number(transaction.amount).toFixed(2)}
+                          {transaction.type === 'inflow' ? '+' : '-'}₵{Number(transaction.amount).toFixed(2)}
                         </TableCell>
                         <TableCell>{transaction.added_by_name}</TableCell>
                       </TableRow>

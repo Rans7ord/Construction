@@ -10,6 +10,9 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Plus, Edit2, Trash2, BarChart3 } from 'lucide-react';
 import { ExpenseModal } from './expense-modal';
+import { formatDate } from '@/lib/date-utils';
+
+// Use when displaying expense dates
 
 interface ExpensesSectionProps {
   projectId: string;
@@ -112,7 +115,7 @@ export function ExpensesSection({ projectId, expenses, steps }: ExpensesSectionP
                           <div className="flex-1">
                             <h5 className="font-medium text-sm">{expense.description}</h5>
                             <div className="flex gap-3 text-xs text-muted-foreground mt-1">
-                              <span>📅 {new Date(expense.date).toLocaleDateString()}</span>
+                              <span>📅 {formatDate(expense.date)}</span>
                               <span>🏢 {expense.vendor}</span>
                               <span>📂 {expense.category}</span>
                             </div>

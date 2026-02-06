@@ -9,6 +9,7 @@ import { useData } from '@/lib/data-context';
 import { ArrowRight, MapPin, DollarSign, Edit2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
+
 interface ProjectCardProps {
   project: Project;
   stats: {

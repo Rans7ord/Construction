@@ -8,6 +8,9 @@ import { ProtectedLayout } from '@/app/app-layout';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { formatDate } from '@/lib/date-utils';
+
+// Use when displaying project details in reports
 import {
   Select,
   SelectContent,
@@ -49,13 +52,13 @@ export default function ReportsPage() {
 
   // ✅ FIX: Add NaN check for formatting
   const formatAmount = (amount: number) => {
-    if (isNaN(amount)) return '$0.0K';
+    if (isNaN(amount)) return '₵0.0K';
     if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
+      return `₵${(amount / 1000000).toFixed(1)}M`;
     } else if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(1)}K`;
+      return `₵${(amount / 1000).toFixed(1)}K`;
     } else {
-      return `$${amount.toLocaleString()}`;
+      return `₵${amount.toLocaleString()}`;
     }
   };
 
@@ -73,10 +76,10 @@ export default function ReportsPage() {
     }
 
     content += 'BUDGET SUMMARY\n';
-    content += `Total Budget: $${totalBudget.toLocaleString()}\n`;
-    content += `Total Income: $${totalIncome.toLocaleString()}\n`;
-    content += `Total Expenses: $${totalSpent.toLocaleString()}\n`;
-    content += `Remaining: $${remaining.toLocaleString()}\n`;
+    content += `Total Budget: ₵${totalBudget.toLocaleString()}\n`;
+    content += `Total Income: ₵${totalIncome.toLocaleString()}\n`;
+    content += `Total Expenses: ₵${totalSpent.toLocaleString()}\n`;
+    content += `Remaining: ₵${remaining.toLocaleString()}\n`;
     content += `Budget Usage: ${totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(2) : 0}%\n\n`;
 
     if (selectedProject) {
@@ -87,12 +90,12 @@ export default function ReportsPage() {
         const stepBudget = Number(step.estimatedBudget || step.estimated_budget || 0);
         
         content += `\n${step.name}\n`;
-        content += `Estimated Budget: $${stepBudget.toLocaleString()}\n`;
-        content += `Actual Expenses: $${stepTotal.toLocaleString()}\n`;
+        content += `Estimated Budget: ₵${stepBudget.toLocaleString()}\n`;
+        content += `Actual Expenses: ₵${stepTotal.toLocaleString()}\n`;
         content += `Status: ${step.status}\n`;
 
         stepExpenses.forEach((exp) => {
-          content += `  - ${exp.description}: $${Number(exp.amount || 0).toLocaleString()} (${exp.category})\n`;
+          content += `  - ${exp.description}: ₵${Number(exp.amount || 0).toLocaleString()} (${exp.category})\n`;
         });
       });
     }
@@ -102,7 +105,7 @@ export default function ReportsPage() {
       const step = projectSteps.find((s) => s.id === expense.stepId);
       content += `${expense.date} - ${expense.description}\n`;
       content += `  Step: ${step?.name || 'Unknown'}\n`;
-      content += `  Amount: $${Number(expense.amount || 0).toLocaleString()}\n`;
+      content += `  Amount: ₵${Number(expense.amount || 0).toLocaleString()}\n`;
       content += `  Vendor: ${expense.vendor}\n`;
       content += `  Category: ${expense.category}\n`;
       content += `  Receipt: ${expense.receipt}\n\n`;

@@ -15,7 +15,9 @@ export async function GET() {
       [session.user.companyId]
     );
 
+    // ✅ FIX: Transform snake_case to camelCase
     return NextResponse.json(snakeToCamel(projects));
+    
   } catch (error) {
     console.error('Get projects error:', error);
     return NextResponse.json(
@@ -84,7 +86,9 @@ export async function POST(request: NextRequest) {
       [projectId]
     );
 
-    return NextResponse.json(project, { status: 201 });
+    // ✅ FIX: Transform snake_case to camelCase before returning
+    return NextResponse.json(snakeToCamel(project), { status: 201 });
+
   } catch (error) {
     console.error('Create project error:', error);
     return NextResponse.json(

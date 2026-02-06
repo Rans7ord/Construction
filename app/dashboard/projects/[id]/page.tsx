@@ -14,6 +14,7 @@ import { StepsSection } from '@/components/steps-section';
 import { MoneyInSection } from '@/components/money-in-section';
 import { ExpensesSection } from '@/components/expenses-section';
 import MaterialsSection from '@/components/materials-section';
+import { formatDate } from '@/lib/date-utils';
 
 export default function ProjectDetailPage() {
   const router = useRouter();

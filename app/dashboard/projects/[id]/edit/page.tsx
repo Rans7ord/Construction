@@ -3,31 +3,52 @@
 import { useAuth } from '@/lib/auth-context';
 import { useData } from '@/lib/data-context';
 import { useRouter, useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ProtectedLayout } from '@/app/app-layout';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Edit2, Trash2, DollarSign, TrendingDown, Download } from 'lucide-react';
-import { BudgetOverview } from '@/components/budget-overview';
-import { StepsSection } from '@/components/steps-section';
-import { MoneyInSection } from '@/components/money-in-section';
-import { ExpensesSection } from '@/components/expenses-section';
-import MaterialsSection from '@/components/materials-section';
+import { ArrowLeft, Building2, MapPin, DollarSign, Calendar, User, Mail, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatDate } from '@/lib/date-utils';
 
-export default function ProjectDetailPage() {
+export default function EditProjectPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
+  const { updateProject, state } = useData();
   const { user } = useAuth();
-  const { state, exportProjectToExcel, deleteProject } = useData();
-  const [activeTab, setActiveTab] = useState<'overview' | 'steps' | 'budget' | 'expenses' | 'materials'>('overview');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState({
+    name: '',
+    location: '',
+    description: '',
+    clientName: '',
+    clientEmail: '',
+    startDate: '',
+    endDate: '',
+    totalBudget: '',
+    status: 'active' as const,
+  });
 
   const project = state.projects.find((p) => p.id === projectId);
-  const projectSteps = state.steps.filter((s) => s.projectId === projectId);
-  const projectMoneyIn = state.moneyIn.filter((m) => m.projectId === projectId);
-  const projectExpenses = state.expenses.filter((e) => e.projectId === projectId);
+
+  useEffect(() => {
+    if (project) {
+      setFormData({
+        name: project.name,
+        location: project.location,
+        description: project.description,
+        clientName: project.clientName,
+        clientEmail: project.clientEmail,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        totalBudget: project.totalBudget.toString(),
+        status: project.status,
+      });
+    }
+  }, [project]);
 
   if (!project) {
     return (
@@ -47,43 +68,70 @@ export default function ProjectDetailPage() {
     );
   }
 
-  // ✅ FIX: Ensure proper number parsing from both snake_case and camelCase
-  const totalBudget = Number(project.totalBudget || project.total_budget || 0);
-  const totalSpent = projectExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + Number(m.amount || 0), 0);
-  const remaining = totalBudget - totalSpent;
-  const percentageSpent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-
-  const formatAmount = (amount: number) => {
-    if (isNaN(amount)) return '₵0.0K';
-    if (amount >= 1000000) {
-      return `₵${(amount / 1000000).toFixed(2)}M`;
-    } else if (amount >= 1000) {
-      return `₵${(amount / 1000).toFixed(1)}K`;
-    } else {
-      return `₵${amount.toLocaleString()}`;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: '',
+      }));
     }
   };
 
-  const handleDeleteProject = () => {
-    deleteProject(projectId);
-    router.push('/dashboard');
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) newErrors.name = 'Project name is required';
+    if (!formData.location.trim()) newErrors.location = 'Location is required';
+    if (!formData.clientName.trim()) newErrors.clientName = 'Client name is required';
+    if (!formData.clientEmail.trim()) {
+      newErrors.clientEmail = 'Client email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.clientEmail)) {
+      newErrors.clientEmail = 'Invalid email address';
+    }
+    if (!formData.startDate) newErrors.startDate = 'Start date is required';
+    if (!formData.endDate) newErrors.endDate = 'End date is required';
+    if (!formData.totalBudget) {
+      newErrors.totalBudget = 'Budget is required';
+    } else if (parseFloat(formData.totalBudget) <= 0) {
+      newErrors.totalBudget = 'Budget must be greater than 0';
+    }
+
+    if (formData.startDate && formData.endDate && formData.startDate > formData.endDate) {
+      newErrors.endDate = 'End date must be after start date';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  // Function to safely format dates
-  const formatDate = (dateString: string | Date) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error('Please fix the form errors');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
+      await updateProject(projectId, {
+        ...formData,
+        totalBudget: parseFloat(formData.totalBudget),
       });
+
+      toast.success('Project updated successfully');
+      router.push(`/dashboard/projects/${projectId}`);
     } catch (error) {
-      return 'Invalid Date';
+      toast.error('Failed to update project');
+      console.error('Update error:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -92,291 +140,235 @@ export default function ProjectDetailPage() {
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
         <DashboardHeader user={user!} />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => router.back()}
-            className="mb-6 gap-2"
+            className="mb-8 gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
 
-          {/* Project Header */}
-          <div className="mb-8">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-4xl font-bold text-foreground mb-2">{project.name}</h1>
-                <div className="flex gap-4 text-sm text-muted-foreground">
-                  <span>📍 {project.location || 'No location specified'}</span>
-                  <span>👤 {project.clientName || 'No client name'}</span>
+          <Card className="border-border/50 shadow-lg">
+            <div className="p-8 md:p-12">
+              <div className="mb-8">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl md:text-4xl font-bold">Edit Project</h1>
+                  </div>
                 </div>
+                <p className="text-muted-foreground">
+                  Update project details, client information, and budget
+                </p>
               </div>
-              <div className="flex gap-2 flex-wrap">
-                {user?.role === 'admin' && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => router.push(`/dashboard/projects/${projectId}/edit`)}
-                      className="gap-2"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => exportProjectToExcel(projectId)}
-                      className="gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Export CSV
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="gap-2 border-destructive text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
-                    </Button>
-                  </>
-                )}
-                <span className="px-4 py-2 rounded-lg bg-green-500/10 text-green-700 font-medium">
-                  {project.status?.charAt(0)?.toUpperCase() + project.status?.slice(1) || 'Active'}
-                </span>
-              </div>
-            </div>
-          </div>
 
-          {/* Budget Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-4 mb-8">
-            <Card className="p-6 border-border/50">
-              <p className="text-sm text-muted-foreground mb-2">Total Budget</p>
-              <p className="text-3xl font-bold text-primary">
-                {formatAmount(totalBudget)}
-              </p>
-            </Card>
-            <Card className="p-6 border-border/50">
-              <p className="text-sm text-muted-foreground mb-2">Total Income/Contract</p>
-              <p className="text-3xl font-bold text-green-600">
-                {formatAmount(totalIncome)}
-              </p>
-            </Card>
-            <Card className="p-6 border-border/50">
-              <p className="text-sm text-muted-foreground mb-2">Total Spent/Expenditure</p>
-              <p className="text-3xl font-bold text-orange-600">
-                {formatAmount(totalSpent)}
-              </p>
-            </Card>
-            <Card className="p-6 border-border/50">
-              <p className="text-sm text-muted-foreground mb-2">Remaining</p>
-              <p className={`text-3xl font-bold ${remaining >= 0 ? 'text-blue-600' : 'text-destructive'}`}>
-                {formatAmount(Math.abs(remaining))}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {remaining >= 0 ? 'Budget surplus' : 'Budget overrun'}
-              </p>
-            </Card>
-          </div>
-
-          {/* Progress Bar */}
-          <Card className="p-6 mb-8 border-border/50">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold">Budget Usage</h3>
-              <span className="text-sm font-semibold">{percentageSpent.toFixed(1)}%</span>
-            </div>
-            <div className="h-3 bg-border rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-accent transition-all"
-                style={{ width: `${Math.min(percentageSpent, 100)}%` }}
-              ></div>
-            </div>
-          </Card>
-
-          {/* Tabs */}
-          <div className="flex gap-4 mb-8 border-b border-border flex-wrap">
-            {['overview', 'steps', 'materials', 'budget', 'expenses'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`px-4 py-3 font-medium transition border-b-2 ${
-                  activeTab === tab
-                    ? 'text-primary border-primary'
-                    : 'text-muted-foreground border-transparent hover:text-foreground'
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content */}
-          <div>
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <Card className="p-6 border-border/50">
-                  <h3 className="text-lg font-semibold mb-4">Project Details</h3>
+              <form onSubmit={handleSubmit} className="space-y-8">
+                {/* Project Information Section */}
+                <div className="border-b border-border pb-8">
+                  <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-primary" />
+                    Project Information
+                  </h2>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <p className="text-sm text-muted-foreground">Description</p>
-                      <p className="text-foreground mt-1">{project.description || 'No description'}</p>
+                      <label className="block text-sm font-medium mb-3">Project Name *</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.name ? 'border-destructive' : 'border-input'
+                        } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition`}
+                        placeholder="e.g., Downtown Office Complex"
+                      />
+                      {errors.name && <p className="text-sm text-destructive mt-1">{errors.name}</p>}
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Timeline</p>
-                      <p className="text-foreground mt-1">
-                        {formatDate(project.startDate)} - {formatDate(project.endDate)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Client Contact</p>
-                      <p className="text-foreground mt-1">{project.clientEmail || 'No email provided'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Created</p>
-                      <p className="text-foreground mt-1">
-                        {formatDate(project.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
 
-                {/* Budget Summary with Proper Calculation */}
-                <Card className="p-6 border-border/50">
-                  <h3 className="text-lg font-semibold mb-4">Budget Summary</h3>
-                  <div className="grid md:grid-cols-3 gap-6">
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Budget</p>
-                      <p className="text-2xl font-bold text-primary">
-                        {formatAmount(totalBudget)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Approved project budget
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Spent</p>
-                      <p className="text-2xl font-bold text-orange-600">
-                        {formatAmount(totalSpent)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Actual expenditure to date
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Remaining Balance</p>
-                      <p className={`text-2xl font-bold ${remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatAmount(Math.abs(remaining))}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {remaining >= 0 ? 'Available balance' : 'Budget overrun by'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground mb-1">Budget Utilization</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 h-2 bg-border rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-accent"
-                          style={{ width: `${Math.min(percentageSpent, 100)}%` }}
-                        ></div>
+                      <label className="block text-sm font-medium mb-3">Location *</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-3.5 w-4 h-4 text-muted-foreground" />
+                        <input
+                          type="text"
+                          name="location"
+                          value={formData.location}
+                          onChange={handleChange}
+                          className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
+                            errors.location ? 'border-destructive' : 'border-input'
+                          } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition`}
+                          placeholder="e.g., 123 Main Street, Downtown"
+                        />
                       </div>
-                      <span className="ml-2 text-sm font-medium">{percentageSpent.toFixed(1)}%</span>
+                      {errors.location && <p className="text-sm text-destructive mt-1">{errors.location}</p>}
                     </div>
                   </div>
-                </Card>
 
-                {/* Project Statistics */}
-                <Card className="p-6 border-border/50">
-                  <h3 className="text-lg font-semibold mb-4">Project Statistics</h3>
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium mb-3">Description</label>
+                    <div className="relative">
+                      <FileText className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={handleChange}
+                        className="w-full pl-10 pr-4 py-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 min-h-24 resize-none transition"
+                        placeholder="Describe the project details, scope, and requirements..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium mb-3">Status *</label>
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
+                    >
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                      <option value="paused">Paused</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Client Information Section */}
+                <div className="border-b border-border pb-8">
+                  <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    Client Information
+                  </h2>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium mb-3">Client Name *</label>
+                      <input
+                        type="text"
+                        name="clientName"
+                        value={formData.clientName}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.clientName ? 'border-destructive' : 'border-input'
+                        } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition`}
+                        placeholder="Client company name"
+                      />
+                      {errors.clientName && <p className="text-sm text-destructive mt-1">{errors.clientName}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-3">Client Email *</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3.5 w-4 h-4 text-muted-foreground" />
+                        <input
+                          type="email"
+                          name="clientEmail"
+                          value={formData.clientEmail}
+                          onChange={handleChange}
+                          className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
+                            errors.clientEmail ? 'border-destructive' : 'border-input'
+                          } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition`}
+                          placeholder="client@example.com"
+                        />
+                      </div>
+                      {errors.clientEmail && <p className="text-sm text-destructive mt-1">{errors.clientEmail}</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project Timeline & Budget Section */}
+                <div className="border-b border-border pb-8">
+                  <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-primary" />
+                    Timeline & Budget
+                  </h2>
                   <div className="grid md:grid-cols-3 gap-6">
                     <div>
-                      <p className="text-sm text-muted-foreground">Project Steps</p>
-                      <p className="text-2xl font-bold text-foreground">
-                        {projectSteps.length}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total project phases
-                      </p>
+                      <label className="block text-sm font-medium mb-3">Start Date *</label>
+                      <input
+                        type="date"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.startDate ? 'border-destructive' : 'border-input'
+                        } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition`}
+                      />
+                      {errors.startDate && <p className="text-sm text-destructive mt-1">{errors.startDate}</p>}
                     </div>
+
                     <div>
-                      <p className="text-sm text-muted-foreground">Expenses</p>
-                      <p className="text-2xl font-bold text-foreground">
-                        {projectExpenses.length}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Individual expense items
-                      </p>
+                      <label className="block text-sm font-medium mb-3">End Date *</label>
+                      <input
+                        type="date"
+                        name="endDate"
+                        value={formData.endDate}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 rounded-lg border ${
+                          errors.endDate ? 'border-destructive' : 'border-input'
+                        } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition`}
+                      />
+                      {errors.endDate && <p className="text-sm text-destructive mt-1">{errors.endDate}</p>}
                     </div>
+
                     <div>
-                      <p className="text-sm text-muted-foreground">Income Sources</p>
-                      <p className="text-2xl font-bold text-foreground">
-                        {projectMoneyIn.length}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Payment/revenue entries
-                      </p>
+                      <label className="block text-sm font-medium mb-3">Total Budget (₵) *</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-3.5 w-4 h-4 text-muted-foreground" />
+                        <input
+                          type="number"
+                          name="totalBudget"
+                          value={formData.totalBudget}
+                          onChange={handleChange}
+                          className={`w-full pl-10 pr-4 py-3 rounded-lg border ${
+                            errors.totalBudget ? 'border-destructive' : 'border-input'
+                          } bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 transition`}
+                          placeholder="0.00"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                      {errors.totalBudget && <p className="text-sm text-destructive mt-1">{errors.totalBudget}</p>}
                     </div>
                   </div>
-                </Card>
-              </div>
-            )}
+                </div>
 
-            {activeTab === 'steps' && <StepsSection projectId={projectId} steps={projectSteps} />}
-
-            {activeTab === 'materials' && (
-              <div className="space-y-6">
-                <MaterialsSection projectId={projectId} steps={projectSteps} />
-              </div>
-            )}
-
-            {activeTab === 'budget' && (
-              <div className="space-y-6">
-                <MoneyInSection projectId={projectId} moneyIn={projectMoneyIn} />
-              </div>
-            )}
-
-            {activeTab === 'expenses' && (
-              <div className="space-y-6">
-                <ExpensesSection
-                  projectId={projectId}
-                  expenses={projectExpenses}
-                  steps={projectSteps}
-                />
-              </div>
-            )}
-          </div>
-        </main>
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <Card className="max-w-md w-full">
-              <div className="p-8">
-                <h2 className="text-2xl font-bold mb-2 text-foreground">Delete Project?</h2>
-                <p className="text-muted-foreground mb-6">
-                  Are you sure you want to delete "{project.name}"? This action cannot be undone. All project data, steps, and expenses will be permanently removed.
-                </p>
-                <div className="flex gap-4">
+                {/* Action Buttons */}
+                <div className="flex gap-4 pt-8">
                   <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Building2 className="w-5 h-5" />
+                        Update Project
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
                     variant="outline"
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="flex-1"
+                    size="lg"
+                    onClick={() => router.back()}
                   >
                     Cancel
                   </Button>
-                  <Button
-                    variant="default"
-                    className="flex-1 bg-destructive hover:bg-destructive/90"
-                    onClick={handleDeleteProject}
-                  >
-                    Delete Project
-                  </Button>
                 </div>
-              </div>
-            </Card>
-          </div>
-        )}
+              </form>
+            </div>
+          </Card>
+        </main>
       </div>
     </ProtectedLayout>
   );

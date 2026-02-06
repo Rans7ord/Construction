@@ -11,6 +11,9 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Building2, MapPin, DollarSign, Calendar, User, Mail, FileText } from 'lucide-react';
+import { formatDateForInput } from '@/lib/date-utils';
+
+// Use in the form for default values
 
 export default function CreateProjectPage() {
   const router = useRouter();

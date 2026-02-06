@@ -11,6 +11,9 @@ import { Plus, Trash2, BarChart3 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
+import { formatDate } from '@/lib/date-utils';
+
+// Use when displaying income dates
 
 interface Material {
   id: string;
