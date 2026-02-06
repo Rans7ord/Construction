@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Building2, MapPin, DollarSign, Calendar, User, Mail, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate } from '@/lib/date-utils';
+import { formatDate, formatDateForInput } from '@/lib/date-utils';
 
 export default function EditProjectPage() {
   const router = useRouter();
@@ -42,8 +42,8 @@ export default function EditProjectPage() {
         description: project.description,
         clientName: project.clientName,
         clientEmail: project.clientEmail,
-        startDate: project.startDate,
-        endDate: project.endDate,
+        startDate: formatDateForInput(project.startDate),
+        endDate: formatDateForInput(project.endDate),
         totalBudget: project.totalBudget.toString(),
         status: project.status,
       });

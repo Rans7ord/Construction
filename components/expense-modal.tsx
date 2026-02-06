@@ -45,7 +45,7 @@ export function ExpenseModal({
       setFormData({
         amount: expense.amount.toString(),
         description: expense.description,
-        date: expense.date,
+        date: formatDateForInput(expense.date),
         category: expense.category,
         vendor: expense.vendor,
         receipt: expense.receipt,

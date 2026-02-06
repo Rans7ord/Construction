@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne, execute } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-function getUserFromToken(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
-  if (!token) return null;
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    return decoded;
-  } catch (error) {
-    return null;
-  }
-}
+import { snakeToCamel } from '@/lib/transform';
 
 export async function GET(
   request: NextRequest,
@@ -41,7 +27,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(moneyIn);
+    return NextResponse.json(snakeToCamel(moneyIn));
   } catch (error) {
     console.error('Get money-in error:', error);
     return NextResponse.json(
@@ -106,7 +92,7 @@ export async function PUT(
       [id]
     );
 
-    return NextResponse.json(updatedMoneyIn);
+    return NextResponse.json(snakeToCamel(updatedMoneyIn));
   } catch (error) {
     console.error('Update money-in error:', error);
     return NextResponse.json(
@@ -121,8 +107,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = getUserFromToken(request);
-    if (!user || user.role !== 'admin') {
+    const session = await getServerSession();
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

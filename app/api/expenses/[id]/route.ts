@@ -1,28 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne, execute } from '@/lib/db';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-function getUserFromToken(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
-  if (!token) return null;
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    return decoded;
-  } catch (error) {
-    return null;
-  }
-}
+import { getServerSession } from '@/lib/auth';
+import { snakeToCamel } from '@/lib/transform';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = getUserFromToken(request);
-    if (!user) {
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -40,7 +27,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(expense);
+    return NextResponse.json(snakeToCamel(expense));
   } catch (error) {
     console.error('Get expense error:', error);
     return NextResponse.json(
@@ -55,8 +42,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = getUserFromToken(request);
-    if (!user) {
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -111,11 +98,11 @@ export async function PUT(
       [id]
     );
 
-    return NextResponse.json(updatedExpense);
+    return NextResponse.json(snakeToCamel(updatedExpense));
   } catch (error) {
     console.error('Update expense error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
     );
   }
@@ -126,8 +113,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = getUserFromToken(request);
-    if (!user || user.role !== 'admin') {
+    const session = await getServerSession();
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

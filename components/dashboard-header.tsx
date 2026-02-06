@@ -35,7 +35,7 @@ export function DashboardHeader({ user }: { user: User }) {
               <Building2 className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-primary">BuildManager</h1>
+              <h1 className="text-2xl font-bold text-primary">Logonvoice</h1>
               <p className="text-xs text-muted-foreground">Construction Management</p>
             </div>
           </div>
