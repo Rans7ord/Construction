@@ -8,7 +8,7 @@ import { ProtectedLayout } from '@/app/app-layout';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatDate } from '@/lib/date-utils';
+import { formatDate, formatAmount, safeNumber } from '@/lib/utils';
 
 // Use when displaying project details in reports
 import {
@@ -43,24 +43,12 @@ export default function ReportsPage() {
 
   // ✅ FIX: Ensure proper number parsing
   const totalBudget = selectedProject
-    ? Number(selectedProject.totalBudget || selectedProject.total_budget || 0)
-    : projects.reduce((sum, p) => sum + Number(p.totalBudget || p.total_budget || 0), 0);
+    ? safeNumber(selectedProject.totalBudget || (selectedProject as any).total_budget)
+    : projects.reduce((sum, p) => sum + safeNumber(p.totalBudget || (p as any).total_budget), 0);
 
-  const totalSpent = projectExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + Number(m.amount || 0), 0);
+  const totalSpent = projectExpenses.reduce((sum, e) => sum + safeNumber(e.amount), 0);
+  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + safeNumber(m.amount), 0);
   const remaining = totalBudget - totalSpent;
-
-  // ✅ FIX: Add NaN check for formatting
-  const formatAmount = (amount: number) => {
-    if (isNaN(amount)) return '₵0.0K';
-    if (amount >= 1000000) {
-      return `₵${(amount / 1000000).toFixed(1)}M`;
-    } else if (amount >= 1000) {
-      return `₵${(amount / 1000).toFixed(1)}K`;
-    } else {
-      return `₵${amount.toLocaleString()}`;
-    }
-  };
 
   const generatePDF = () => {
     let content = 'BuildManager - Project Report\n';
@@ -87,10 +75,11 @@ export default function ReportsPage() {
       projectSteps.forEach((step) => {
         const stepExpenses = projectExpenses.filter((e) => e.stepId === step.id);
         const stepTotal = stepExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-        const stepBudget = Number(step.estimatedBudget || step.estimated_budget || 0);
+        const stepBudget = Number(step.estimatedBudget || 0);
         
         content += `\n${step.name}\n`;
         content += `Estimated Budget: ₵${stepBudget.toLocaleString()}\n`;
+
         content += `Actual Expenses: ₵${stepTotal.toLocaleString()}\n`;
         content += `Status: ${step.status}\n`;
 
@@ -283,8 +272,9 @@ export default function ReportsPage() {
                   .map((step) => {
                     const stepExpenses = projectExpenses.filter((e) => e.stepId === step.id);
                     const stepTotal = stepExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-                    const stepBudget = Number(step.estimatedBudget || step.estimated_budget || 0);
+                    const stepBudget = Number(step.estimatedBudget || 0);
                     const stepPercentage = stepBudget > 0 ? (stepTotal / stepBudget) * 100 : 0;
+
 
                     return (
                       <div key={step.id} className="p-4 bg-muted/30 rounded-lg">

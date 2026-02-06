@@ -1,6 +1,8 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import { formatAmount } from '@/lib/utils';
+
 
 interface ProfitOverviewProps {
   totalIncome: number;
@@ -20,24 +22,27 @@ export default function ProfitOverview({
       <Card className="p-4 rounded-lg bg-gradient-to-br from-green-500/5 to-green-500/10 border border-green-500/20">
         <p className="text-xs text-muted-foreground mb-1 font-medium">Total Income/Contract</p>
         <p className="text-2xl font-bold text-green-600">
-          ₵{(totalIncome / 1000).toFixed(1)}K
+          {formatAmount(totalIncome)}
         </p>
+
         <p className="text-xs text-muted-foreground mt-2">From all payments</p>
       </Card>
 
       <Card className="p-4 rounded-lg bg-gradient-to-br from-orange-500/5 to-orange-500/10 border border-orange-500/20">
         <p className="text-xs text-muted-foreground mb-1 font-medium">Total Spent/Expenditure</p>
         <p className="text-2xl font-bold text-orange-600">
-          ₵{(totalSpent / 1000).toFixed(1)}K
+          {formatAmount(totalSpent)}
         </p>
+
         <p className="text-xs text-muted-foreground mt-2">All expenses</p>
       </Card>
 
       <Card className="p-4 rounded-lg bg-gradient-to-br from-blue-500/5 to-blue-500/10 border border-blue-500/20">
         <p className="text-xs text-muted-foreground mb-1 font-medium">Profit (10%)</p>
         <p className="text-2xl font-bold text-blue-600">
-          ₵{(profit / 1000).toFixed(1)}K
+          {formatAmount(profit)}
         </p>
+
         <p className="text-xs text-muted-foreground mt-2">10% of total income</p>
       </Card>
 
@@ -48,8 +53,9 @@ export default function ProfitOverview({
       }`}>
         <p className="text-xs text-muted-foreground mb-1 font-medium">Budget Remaining</p>
         <p className={`text-2xl font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-          ₵{(remaining / 1000).toFixed(1)}K
+          {formatAmount(remaining)}
         </p>
+
         <p className="text-xs text-muted-foreground mt-2">
           {remaining >= 0 ? 'Available budget' : 'Budget exceeded'}
         </p>

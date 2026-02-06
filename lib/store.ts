@@ -17,7 +17,7 @@ export interface Project {
   clientEmail: string;
   startDate: string;
   endDate: string;
-  totalBudget: string | number;
+  totalBudget: number;
   createdBy: string;
   createdAt: string;
   status: 'active' | 'completed' | 'paused';

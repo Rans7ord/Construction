@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useData } from '@/lib/data-context';
 import { ArrowRight, MapPin, DollarSign, Edit2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { safeNumber, formatAmount } from '@/lib/utils';
 
 
 interface ProjectCardProps {
@@ -23,9 +24,10 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
   const { user } = useAuth();
   const { deleteProject } = useData();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const totalExpenses = Number(stats.totalExpenses);
-  const totalBudget = Number(project.totalBudget);
-  const spentPercentage = (totalExpenses / totalBudget) * 100;
+  // ✅ FIX: Safely extract numbers from both naming conventions
+  const totalBudget = safeNumber(project.totalBudget || (project as any).total_budget);
+  const totalExpenses = safeNumber(stats.totalExpenses);
+  const spentPercentage = totalBudget > 0 ? (totalExpenses / totalBudget) * 100 : 0;
 
   const handleDelete = () => {
     deleteProject(project.id);
@@ -81,13 +83,13 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
             <div>
               <p className="text-muted-foreground">Budget</p>
               <p className="font-semibold text-foreground">
-                ₵{(Number(project.totalBudget) / 1000).toFixed(1)}K
+                {formatAmount(totalBudget)}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Spent</p>
               <p className="font-semibold text-foreground">
-                ₵{(Number(stats.totalExpenses) / 1000).toFixed(1)}K
+                {formatAmount(totalExpenses)}
               </p>
             </div>
           </div>

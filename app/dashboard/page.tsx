@@ -12,6 +12,7 @@ import { DashboardHeader } from '@/components/dashboard-header';
 import { DashboardStats } from '@/components/dashboard-stats';
 import ProfitOverview from '@/components/profit-overview';
 import { Plus } from 'lucide-react';
+import { safeNumber } from '@/lib/utils';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -27,20 +28,16 @@ export default function DashboardPage() {
 
   const projects = state.projects;
   
-  // ✅ FIX: Handle both snake_case and camelCase, ensure proper number parsing
   const totalBudget = projects.reduce((sum, p) => {
-    const budget = Number(p.totalBudget || p.total_budget || 0);
-    return sum + budget;
+    return sum + safeNumber(p.totalBudget || (p as any).total_budget);
   }, 0);
-  
+
   const totalSpent = state.expenses.reduce((sum, e) => {
-    const amount = Number(e.amount || 0);
-    return sum + amount;
+    return sum + safeNumber(e.amount);
   }, 0);
-  
+
   const totalIncome = state.moneyIn.reduce((sum, m) => {
-    const amount = Number(m.amount || 0);
-    return sum + amount;
+    return sum + safeNumber(m.amount);
   }, 0);
   
   const remaining = totalBudget - totalSpent;

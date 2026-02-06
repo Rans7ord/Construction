@@ -2,6 +2,7 @@
 
 import { Card } from './ui/card';
 import { DollarSign, TrendingDown, TrendingUp, Briefcase } from 'lucide-react';
+import { formatAmount } from '@/lib/utils';
 
 interface DashboardStatsProps {
   totalBudget: number;
@@ -67,7 +68,7 @@ export function DashboardStats({
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">{stat.label}</p>
                   <p className="text-3xl font-bold text-foreground">
-                    ₵{(stat.value / 1000).toFixed(1)}K
+                    {formatAmount(stat.value)}
                   </p>
                 </div>
                 <div className={`${stat.bgColor} p-3 rounded-lg`}>

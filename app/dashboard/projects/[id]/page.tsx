@@ -14,7 +14,7 @@ import { StepsSection } from '@/components/steps-section';
 import { MoneyInSection } from '@/components/money-in-section';
 import { ExpensesSection } from '@/components/expenses-section';
 import MaterialsSection from '@/components/materials-section';
-import { formatDate } from '@/lib/date-utils';
+import { formatDate, formatAmount, safeNumber } from '@/lib/utils';
 
 export default function ProjectDetailPage() {
   const router = useRouter();
@@ -49,43 +49,16 @@ export default function ProjectDetailPage() {
   }
 
   // ✅ FIX: Ensure proper number parsing from both snake_case and camelCase
-  const totalBudget = Number(project.totalBudget || project.total_budget || 0);
-  const totalSpent = projectExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + Number(m.amount || 0), 0);
+  const totalBudget = safeNumber(project.totalBudget || (project as any).total_budget);
+  const totalSpent = projectExpenses.reduce((sum, e) => sum + safeNumber(e.amount), 0);
+  const totalIncome = projectMoneyIn.reduce((sum, m) => sum + safeNumber(m.amount), 0);
   const remaining = totalBudget - totalSpent;
   const percentageSpent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-
-  const formatAmount = (amount: number) => {
-    if (isNaN(amount)) return '₵0.0K';
-    if (amount >= 1000000) {
-      return `₵${(amount / 1000000).toFixed(2)}M`;
-    } else if (amount >= 1000) {
-      return `₵${(amount / 1000).toFixed(1)}K`;
-    } else {
-      return `₵${amount.toLocaleString()}`;
-    }
-  };
+  const profit = totalIncome * 0.1;
 
   const handleDeleteProject = () => {
     deleteProject(projectId);
     router.push('/dashboard');
-  };
-
-  // Function to safely format dates
-  const formatDate = (dateString: string | Date) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      });
-    } catch (error) {
-      return 'Invalid Date';
-    }
   };
 
   return (
@@ -150,7 +123,7 @@ export default function ProjectDetailPage() {
           </div>
 
           {/* Budget Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-4 mb-8">
+          <div className="grid gap-4 md:grid-cols-5 mb-8">
             <Card className="p-6 border-border/50">
               <p className="text-sm text-muted-foreground mb-2">Total Budget</p>
               <p className="text-3xl font-bold text-primary">
@@ -176,6 +149,15 @@ export default function ProjectDetailPage() {
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {remaining >= 0 ? 'Budget surplus' : 'Budget overrun'}
+              </p>
+            </Card>
+            <Card className="p-6 border-border/50">
+              <p className="text-sm text-muted-foreground mb-2">Profit (10%)</p>
+              <p className="text-3xl font-bold text-blue-600">
+                {formatAmount(profit)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                10% of total income
               </p>
             </Card>
           </div>

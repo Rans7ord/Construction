@@ -29,7 +29,7 @@ export default function EditProjectPage() {
     startDate: '',
     endDate: '',
     totalBudget: '',
-    status: 'active' as const,
+    status: 'active' as 'active' | 'completed' | 'paused',
   });
 
   const project = state.projects.find((p) => p.id === projectId);
