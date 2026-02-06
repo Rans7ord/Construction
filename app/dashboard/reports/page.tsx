@@ -8,7 +8,8 @@ import { ProtectedLayout } from '@/app/app-layout';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatDate, formatAmount, safeNumber } from '@/lib/utils';
+import { formatAmount, safeNumber } from '@/lib/utils';
+import { formatDate } from '@/lib/date-utils';
 
 // Use when displaying project details in reports
 import {

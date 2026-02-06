@@ -14,8 +14,8 @@ import { StepsSection } from '@/components/steps-section';
 import { MoneyInSection } from '@/components/money-in-section';
 import { ExpensesSection } from '@/components/expenses-section';
 import MaterialsSection from '@/components/materials-section';
-import { formatDate, formatAmount, safeNumber } from '@/lib/utils';
-import { formatDate as formatDateUtil } from '@/lib/date-utils';
+import { formatAmount, safeNumber } from '@/lib/utils';
+import { formatDate } from '@/lib/date-utils';
 
 export default function ProjectDetailPage() {
   const router = useRouter();
@@ -218,7 +218,7 @@ export default function ProjectDetailPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Created</p>
                       <p className="text-foreground mt-1">
-                        {formatDateUtil(project.createdAt)}
+                        {formatDate(project.createdAt)}
                       </p>
                     </div>
                   </div>

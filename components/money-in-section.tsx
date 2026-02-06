@@ -8,6 +8,7 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { MoneyInModal } from './money-in-modal';
+import { formatDate } from '@/lib/date-utils';
 
 interface MoneyInSectionProps {
   projectId: string;
@@ -81,7 +82,7 @@ export function MoneyInSection({ projectId, moneyIn }: MoneyInSectionProps) {
                   <div className="flex-1">
                     <h4 className="font-semibold">{money.description}</h4>
                     <div className="flex gap-4 text-sm text-muted-foreground mt-1">
-                      <span>📅 {new Date(money.date).toLocaleDateString()}</span>
+                      <span>📅 {formatDate(money.date)}</span>
                       <span>📄 {money.reference}</span>
                     </div>
                   </div>
