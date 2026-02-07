@@ -441,71 +441,98 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  // Fixed CSV Export function for lib/data-context.tsx
+  // Replace the exportProjectToExcel function with this version
+
   const exportProjectToExcel = (projectId: string) => {
-    const project = state.projects.find((p) => p.id === projectId);
-    if (!project) return;
+      const project = state.projects.find((p) => p.id === projectId);
+      if (!project) return;
 
-    const projectSteps = state.steps.filter((s) => s.projectId === projectId);
-    const projectExpenses = state.expenses.filter((e) => e.projectId === projectId);
-    const projectIncome = state.moneyIn.filter((m) => m.projectId === projectId);
+      const projectSteps = state.steps.filter((s) => s.projectId === projectId);
+      const projectExpenses = state.expenses.filter((e) => e.projectId === projectId);
+      const projectIncome = state.moneyIn.filter((m) => m.projectId === projectId);
 
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    
-    // Project Info
-    csvContent += `PROJECT REPORT\n`;
-    csvContent += `Project Name,${project.name}\n`;
-    csvContent += `Location,${project.location}\n`;
-    csvContent += `Client Name,${project.clientName}\n`;
-    csvContent += `Client Email,${project.clientEmail}\n`;
-    csvContent += `Status,${project.status}\n`;
-    csvContent += `Start Date,${project.startDate}\n`;
-    csvContent += `End Date,${project.endDate}\n`;
-    csvContent += `Total Budget,₵${parseFloat(project.totalBudget as string).toLocaleString()}\n\n`;
-
-    // Money In
-    csvContent += `MONEY IN / INCOME\n`;
-    csvContent += `Date,Description,Reference,Amount\n`;
-    projectIncome.forEach((income) => {
-      csvContent += `${income.date},"${income.description}",${income.reference},₵${income.amount.toLocaleString()}\n`;
-    });
-    const totalIncome = projectIncome.reduce((sum, m) => sum + m.amount, 0);
-    csvContent += `\nTotal Income,,₵,₵${totalIncome.toLocaleString()}\n\n`;
-
-    // Expenses by Step
-    csvContent += `EXPENSES BY STEP\n`;
-    projectSteps.forEach((step) => {
-      const stepExpenses = projectExpenses.filter((e) => e.stepId === step.id);
-      csvContent += `\n${step.name}\n`;
-      csvContent += `Status,${step.status}\n`;
-      csvContent += `Estimated Budget,₵${step.estimatedBudget.toLocaleString()}\n`;
-      csvContent += `Description,${step.description}\n\n`;
-      csvContent += `Date,Description,Category,Vendor,Receipt,Amount\n`;
+      let csvContent = 'data:text/csv;charset=utf-8,';
       
-      stepExpenses.forEach((expense) => {
-        csvContent += `${expense.date},"${expense.description}",${expense.category},${expense.vendor},${expense.receipt},₵${expense.amount.toLocaleString()}\n`;
+      // ✅ FIX: Safe date formatting helper
+      const safeDateFormat = (date: any): string => {
+        if (!date) return 'N/A';
+        if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return date; // Already in YYYY-MM-DD format
+        }
+        try {
+          const d = new Date(date);
+          if (isNaN(d.getTime())) return 'N/A';
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        } catch {
+          return 'N/A';
+        }
+      };
+
+      // ✅ FIX: Safe number formatting
+      const safeNumber = (val: any): number => {
+        const num = Number(val);
+        return isNaN(num) ? 0 : num;
+      };
+
+      // Project Info
+      csvContent += `PROJECT REPORT\n`;
+      csvContent += `Project Name,${project.name}\n`;
+      csvContent += `Location,${project.location}\n`;
+      csvContent += `Client Name,${project.clientName}\n`;
+      csvContent += `Client Email,${project.clientEmail}\n`;
+      csvContent += `Status,${project.status}\n`;
+      csvContent += `Start Date,${safeDateFormat(project.startDate)}\n`;
+      csvContent += `End Date,${safeDateFormat(project.endDate)}\n`;
+      csvContent += `Total Budget,₵${safeNumber(project.totalBudget).toLocaleString()}\n\n`;
+
+      // Money In
+      csvContent += `MONEY IN / INCOME\n`;
+      csvContent += `Date,Description,Reference,Amount\n`;
+      projectIncome.forEach((income) => {
+        csvContent += `${safeDateFormat(income.date)},"${income.description}",${income.reference},₵${safeNumber(income.amount).toLocaleString()}\n`;
       });
-      
-      const stepTotal = stepExpenses.reduce((sum, e) => sum + e.amount, 0);
-      csvContent += `Total for ${step.name},,₵,₵${stepTotal.toLocaleString()}\n`;
-    });
+      const totalIncome = projectIncome.reduce((sum, m) => sum + safeNumber(m.amount), 0);
+      csvContent += `\nTotal Income,,,₵${totalIncome.toLocaleString()}\n\n`;
 
-    // Summary
-    const totalExpenses = projectExpenses.reduce((sum, e) => sum + e.amount, 0);
-    csvContent += `\n\nSUMMARY\n`;
-    csvContent += `Total Budget,₵${project.totalBudget.toLocaleString()}\n`;
-    csvContent += `Total Income,₵${totalIncome.toLocaleString()}\n`;
-    csvContent += `Total Expenses,₵${totalExpenses.toLocaleString()}\n`;
-    const budget = parseFloat(project.totalBudget as string);
-    csvContent += `Remaining,₵${(budget - totalExpenses).toLocaleString()}\n`;
-    csvContent += `Budget Utilization,${((totalExpenses / budget) * 100).toFixed(2)}%\n`;
+      // Expenses by Step
+      csvContent += `EXPENSES BY STEP\n`;
+      projectSteps.forEach((step) => {
+        const stepExpenses = projectExpenses.filter((e) => e.stepId === step.id);
+        csvContent += `\n${step.name}\n`;
+        csvContent += `Status,${step.status}\n`;
+        csvContent += `Estimated Budget,₵${safeNumber(step.estimatedBudget).toLocaleString()}\n`;
+        csvContent += `Description,"${step.description}"\n\n`;
+        csvContent += `Date,Description,Category,Vendor,Receipt,Amount\n`;
+        
+        stepExpenses.forEach((expense) => {
+          csvContent += `${safeDateFormat(expense.date)},"${expense.description}",${expense.category},${expense.vendor},${expense.receipt},₵${safeNumber(expense.amount).toLocaleString()}\n`;
+        });
+        
+        const stepTotal = stepExpenses.reduce((sum, e) => sum + safeNumber(e.amount), 0);
+        csvContent += `Total for ${step.name},,,,,₵${stepTotal.toLocaleString()}\n`;
+      });
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${project.name.replace(/\s+/g, '_')}_report.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // Summary
+      const totalExpenses = projectExpenses.reduce((sum, e) => sum + safeNumber(e.amount), 0);
+      const budget = safeNumber(project.totalBudget);
+      csvContent += `\n\nSUMMARY\n`;
+      csvContent += `Total Budget,₵${budget.toLocaleString()}\n`;
+      csvContent += `Total Income,₵${totalIncome.toLocaleString()}\n`;
+      csvContent += `Total Expenses,₵${totalExpenses.toLocaleString()}\n`;
+      csvContent += `Remaining,₵${(budget - totalExpenses).toLocaleString()}\n`;
+      csvContent += `Budget Utilization,${budget > 0 ? ((totalExpenses / budget) * 100).toFixed(2) : 0}%\n`;
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `${project.name.replace(/\s+/g, '_')}_report.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
 
   return (

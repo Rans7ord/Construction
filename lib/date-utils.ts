@@ -1,222 +1,200 @@
 /**
- * Date utility functions for consistent date handling across the application
- * All dates are displayed and stored in YYYY-MM-DD format
+ * COMPREHENSIVE DATE UTILITY - FIXES ALL "Invalid Date" ISSUES
+ * This replaces lib/date-utils.ts with bulletproof date handling
  */
 
 /**
- * Formats a date for display (YYYY-MM-DD format: 2026-02-05)
- * Handles various input types: string, Date object, undefined, null
+ * Core function to safely parse ANY date input
+ * Returns a valid Date object or null
  */
-export function formatDate(dateInput: string | Date | undefined | null): string {
-  // Handle null/undefined
-  if (!dateInput) {
-    return 'N/A';
+function safeParseDate(dateInput: any): Date | null {
+  // Handle null/undefined/empty
+  if (!dateInput || dateInput === '') {
+    return null;
   }
-  
+
   try {
+    // Already a Date object
+    if (dateInput instanceof Date) {
+      return isNaN(dateInput.getTime()) ? null : dateInput;
+    }
+
     // Handle string inputs
     if (typeof dateInput === 'string') {
-      // If it's already formatted or empty, return as-is or N/A
-      if (dateInput.trim() === '') {
-        return 'N/A';
+      const trimmed = dateInput.trim();
+      if (trimmed === '' || trimmed === 'Invalid Date') {
+        return null;
       }
-      
-      // If already in YYYY-MM-DD format, validate and return
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-        const testDate = new Date(dateInput);
-        if (!isNaN(testDate.getTime())) {
-          return dateInput; // Already in correct format
-        }
-      }
-      
-      // Parse the date string
-      const date = new Date(dateInput);
-      
-      // Check if the date is valid
-      if (isNaN(date.getTime())) {
-        console.warn('Invalid date string:', dateInput);
-        return 'Invalid Date';
-      }
-      
-      // Format as YYYY-MM-DD
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      
-      return `${year}-${month}-${day}`;
+
+      // Try parsing the string
+      const parsed = new Date(trimmed);
+      return isNaN(parsed.getTime()) ? null : parsed;
     }
-    
-    // Handle Date objects
-    if (dateInput instanceof Date) {
-      if (isNaN(dateInput.getTime())) {
-        console.warn('Invalid Date object');
-        return 'Invalid Date';
-      }
-      
-      // Format as YYYY-MM-DD
-      const year = dateInput.getFullYear();
-      const month = String(dateInput.getMonth() + 1).padStart(2, '0');
-      const day = String(dateInput.getDate()).padStart(2, '0');
-      
-      return `${year}-${month}-${day}`;
+
+    // Handle number (timestamp)
+    if (typeof dateInput === 'number') {
+      const parsed = new Date(dateInput);
+      return isNaN(parsed.getTime()) ? null : parsed;
     }
-    
-    // Fallback for unexpected types
-    console.warn('Unexpected date type:', typeof dateInput);
-    return 'Invalid Date';
-    
+
+    // Handle objects with date properties (like {startDate: "2024-01-01"})
+    if (typeof dateInput === 'object') {
+      // Try common property names
+      const dateValue = dateInput.date || dateInput.value || dateInput.toString();
+      return safeParseDate(dateValue);
+    }
+
+    return null;
   } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Invalid Date';
+    console.warn('Date parsing error:', error, 'Input:', dateInput);
+    return null;
   }
 }
 
 /**
- * Formats a date for HTML input fields (YYYY-MM-DD)
- * Used in forms with date inputs
- * NOTE: This is the same as formatDate() - kept for semantic clarity
+ * Format date as YYYY-MM-DD (safe, never returns "Invalid Date")
  */
-export function formatDateForInput(dateInput: string | Date | undefined | null): string {
-  // Handle null/undefined
-  if (!dateInput) {
-    return '';
-  }
+export function formatDate(dateInput: any): string {
+  const date = safeParseDate(dateInput);
   
+  if (!date) {
+    return 'N/A';
+  }
+
   try {
-    let date: Date;
-    
-    // Handle string inputs
-    if (typeof dateInput === 'string') {
-      // If empty string, return empty
-      if (dateInput.trim() === '') {
-        return '';
-      }
-      
-      // If already in YYYY-MM-DD format, return as-is
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-        // Validate it's a real date
-        const testDate = new Date(dateInput);
-        if (!isNaN(testDate.getTime())) {
-          return dateInput;
-        }
-      }
-      
-      date = new Date(dateInput);
-    } 
-    // Handle Date objects
-    else if (dateInput instanceof Date) {
-      date = dateInput;
-    } 
-    // Unexpected type
-    else {
-      console.warn('Unexpected date type for input:', typeof dateInput);
-      return '';
-    }
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      console.warn('Invalid date for input:', dateInput);
-      return '';
-    }
-    
-    // Format as YYYY-MM-DD
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     
     return `${year}-${month}-${day}`;
-    
   } catch (error) {
-    console.error('Error formatting date for input:', error);
+    console.warn('Date formatting error:', error, 'Input:', dateInput);
+    return 'N/A';
+  }
+}
+
+/**
+ * Format date for HTML input fields (YYYY-MM-DD)
+ * Returns empty string if invalid (for form inputs)
+ */
+export function formatDateForInput(dateInput: any): string {
+  const date = safeParseDate(dateInput);
+  
+  if (!date) {
+    return '';
+  }
+
+  try {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.warn('Date formatting error for input:', error, 'Input:', dateInput);
     return '';
   }
 }
 
 /**
- * Gets today's date in YYYY-MM-DD format
- * Useful for default values in date inputs
+ * Get today's date in YYYY-MM-DD format
  */
 export function getTodayForInput(): string {
   return formatDateForInput(new Date());
 }
 
 /**
- * Parses a date string and returns a Date object
- * Returns null if parsing fails
+ * Parse date string and return Date object or null
  */
-export function parseDate(dateString: string | undefined | null): Date | null {
-  if (!dateString || dateString.trim() === '') {
-    return null;
+export function parseDate(dateString: any): Date | null {
+  return safeParseDate(dateString);
+}
+
+/**
+ * Check if a date value is valid
+ */
+export function isValidDate(dateInput: any): boolean {
+  return safeParseDate(dateInput) !== null;
+}
+
+/**
+ * Format date for database storage (YYYY-MM-DD)
+ */
+export function formatDateForDB(dateInput: any): string {
+  const formatted = formatDateForInput(dateInput);
+  return formatted || new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Compare two dates - returns true if date1 is before date2
+ */
+export function isDateBefore(date1: any, date2: any): boolean {
+  const d1 = safeParseDate(date1);
+  const d2 = safeParseDate(date2);
+  
+  if (!d1 || !d2) {
+    return false;
   }
   
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return null;
-    }
-    return date;
-  } catch (error) {
-    console.error('Error parsing date:', error);
-    return null;
-  }
+  return d1.getTime() < d2.getTime();
 }
 
 /**
- * Validates if a date string is valid
+ * Compare two dates - returns true if date1 is after date2
  */
-export function isValidDate(dateString: string | undefined | null): boolean {
-  if (!dateString || dateString.trim() === '') {
+export function isDateAfter(date1: any, date2: any): boolean {
+  const d1 = safeParseDate(date1);
+  const d2 = safeParseDate(date2);
+  
+  if (!d1 || !d2) {
     return false;
   }
   
+  return d1.getTime() > d2.getTime();
+}
+
+/**
+ * Format date in a human-friendly way
+ * Examples: "Jan 15, 2024" or "Feb 7, 2026"
+ */
+export function formatDateFriendly(dateInput: any): string {
+  const date = safeParseDate(dateInput);
+  
+  if (!date) {
+    return 'N/A';
+  }
+
   try {
-    const date = new Date(dateString);
-    return !isNaN(date.getTime());
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    
+    return `${month} ${day}, ${year}`;
   } catch (error) {
-    return false;
+    console.warn('Friendly date formatting error:', error, 'Input:', dateInput);
+    return 'N/A';
   }
 }
 
 /**
- * Formats a date for database storage (YYYY-MM-DD)
- * Same as formatDateForInput, but semantically different purpose
+ * Get date range string
  */
-export function formatDateForDB(dateInput: string | Date | undefined | null): string {
-  return formatDateForInput(dateInput);
-}
-
-/**
- * Compares two dates and returns true if date1 is before date2
- */
-export function isDateBefore(date1: string | Date, date2: string | Date): boolean {
-  try {
-    const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
-    const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
-    
-    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
-      return false;
-    }
-    
-    return d1.getTime() < d2.getTime();
-  } catch (error) {
-    return false;
+export function formatDateRange(startDate: any, endDate: any): string {
+  const start = formatDate(startDate);
+  const end = formatDate(endDate);
+  
+  if (start === 'N/A' && end === 'N/A') {
+    return 'N/A';
   }
-}
-
-/**
- * Compares two dates and returns true if date1 is after date2
- */
-export function isDateAfter(date1: string | Date, date2: string | Date): boolean {
-  try {
-    const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
-    const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
-    
-    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
-      return false;
-    }
-    
-    return d1.getTime() > d2.getTime();
-  } catch (error) {
-    return false;
+  
+  if (start === 'N/A') {
+    return `Until ${end}`;
   }
+  
+  if (end === 'N/A') {
+    return `From ${start}`;
+  }
+  
+  return `${start} - ${end}`;
 }

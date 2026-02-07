@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
 import { query, queryOne } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { getServerSession } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,10 +38,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ✅ FIX: Check if this is an admin creating a user (authenticated request)
+    const session = await getServerSession();
+    let companyId: string;
+
+    if (session?.user && session.user.role === 'admin') {
+      // ✅ Admin creating a user - use the admin's company_id
+      companyId = session.user.companyId;
+      console.log(`[SIGNUP] Admin ${session.user.email} creating user for company ${companyId}`);
+    } else {
+      // ✅ Public signup - create a new company
+      companyId = uuidv4();
+      console.log(`[SIGNUP] Public signup - creating new company ${companyId}`);
+    }
+
     // Hash password
     const hashedPassword = await bcryptjs.hash(password, 10);
     const userId = uuidv4();
-    const companyId = uuidv4();
 
     // Create user
     await query(

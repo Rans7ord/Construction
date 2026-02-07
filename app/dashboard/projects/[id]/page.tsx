@@ -208,7 +208,7 @@ export default function ProjectDetailPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Timeline</p>
                       <p className="text-foreground mt-1">
-                        {formatDate(project.startDate)} - {formatDate(project.endDate)}
+                        {formatDate(project.startDate || (project as any).start_date)} - {formatDate(project.endDate || (project as any).end_date)}
                       </p>
                     </div>
                     <div>
@@ -218,7 +218,7 @@ export default function ProjectDetailPage() {
                     <div>
                       <p className="text-sm text-muted-foreground">Created</p>
                       <p className="text-foreground mt-1">
-                        {formatDate(project.createdAt)}
+                        {formatDate(project.createdAt || (project as any).created_at)}
                       </p>
                     </div>
                   </div>
