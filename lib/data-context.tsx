@@ -65,7 +65,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const projectsResponse = await fetch('/api/projects');
         if (projectsResponse.ok) {
           const projects = await projectsResponse.json();
-          setState(prev => ({ ...prev, projects }));
+          // Ensure projects are in camelCase format
+          const transformedProjects = projects.map((project: any) => ({
+            ...project,
+            startDate: project.startDate || project.start_date,
+            endDate: project.endDate || project.end_date,
+            createdAt: project.createdAt || project.created_at,
+            totalBudget: project.totalBudget || project.total_budget,
+            clientName: project.clientName || project.client_name,
+            clientEmail: project.clientEmail || project.client_email,
+          }));
+          setState(prev => ({ ...prev, projects: transformedProjects }));
         }
 
         // Load steps
@@ -138,9 +148,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       if (response.ok) {
         const updatedProject = await response.json();
+        // Ensure updated project is in camelCase format
+        const transformedProject = {
+          ...updatedProject,
+          startDate: updatedProject.startDate || updatedProject.start_date,
+          endDate: updatedProject.endDate || updatedProject.end_date,
+          createdAt: updatedProject.createdAt || updatedProject.created_at,
+          totalBudget: updatedProject.totalBudget || updatedProject.total_budget,
+          clientName: updatedProject.clientName || updatedProject.client_name,
+          clientEmail: updatedProject.clientEmail || updatedProject.client_email,
+        };
         setState(prev => ({
           ...prev,
-          projects: prev.projects.map((p) => (p.id === id ? updatedProject : p)),
+          projects: prev.projects.map((p) => (p.id === id ? transformedProject : p)),
         }));
       } else {
         throw new Error('Failed to update project');

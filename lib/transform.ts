@@ -13,6 +13,23 @@ export function snakeToCamel(obj: any): any {
     return obj;
   }
 
+  // Handle Date objects - convert to ISO date string
+  if (obj instanceof Date) {
+    return obj.toISOString().split('T')[0]; // YYYY-MM-DD format
+  }
+
+  // Handle date-like objects that might come from database
+  if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+    // Check if it has date-like properties or is a date wrapper
+    if (obj.constructor && obj.constructor.name === 'Date') {
+      return obj.toISOString().split('T')[0];
+    }
+    // If it's an empty object, it might be a corrupted date - return null
+    if (Object.keys(obj).length === 0) {
+      return null;
+    }
+  }
+
   if (Array.isArray(obj)) {
     return obj.map(snakeToCamel);
   }

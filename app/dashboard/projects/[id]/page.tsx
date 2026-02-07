@@ -1,9 +1,9 @@
 'use client';
 
+import React, { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useData } from '@/lib/data-context';
 import { useRouter, useParams } from 'next/navigation';
-import { useState } from 'react';
 import { ProtectedLayout } from '@/app/app-layout';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { Card } from '@/components/ui/card';
@@ -30,6 +30,8 @@ export default function ProjectDetailPage() {
   const projectSteps = state.steps.filter((s) => s.projectId === projectId);
   const projectMoneyIn = state.moneyIn.filter((m) => m.projectId === projectId);
   const projectExpenses = state.expenses.filter((e) => e.projectId === projectId);
+
+
 
   if (!project) {
     return (
@@ -305,6 +307,8 @@ export default function ProjectDetailPage() {
                 </Card>
               </div>
             )}
+
+            
 
             {activeTab === 'steps' && <StepsSection projectId={projectId} steps={projectSteps} />}
 

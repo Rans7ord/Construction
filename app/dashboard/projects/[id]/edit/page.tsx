@@ -67,6 +67,7 @@ export default function EditProjectPage() {
       </ProtectedLayout>
     );
   }
+  
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -134,6 +135,8 @@ export default function EditProjectPage() {
       setIsSubmitting(false);
     }
   };
+
+  
 
   return (
     <ProtectedLayout>
@@ -236,6 +239,7 @@ export default function EditProjectPage() {
                     </select>
                   </div>
                 </div>
+                
 
                 {/* Client Information Section */}
                 <div className="border-b border-border pb-8">

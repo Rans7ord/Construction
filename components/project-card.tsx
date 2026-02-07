@@ -1,3 +1,10 @@
+/**
+ * WORKING FIX - Based on Petty Cash Pattern
+ * 
+ * Replace components/project-card.tsx with this version
+ * that handles both snake_case and camelCase gracefully
+ */
+
 'use client';
 
 import { Project } from '@/lib/store';
@@ -6,10 +13,10 @@ import { Button } from './ui/button';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useData } from '@/lib/data-context';
-import { ArrowRight, MapPin, DollarSign, Edit2, Trash2 } from 'lucide-react';
+import { ArrowRight, MapPin, Edit2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { safeNumber, formatAmount } from '@/lib/utils';
-
+import { formatDate } from '@/lib/date-utils';
 
 interface ProjectCardProps {
   project: Project;
@@ -24,10 +31,23 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
   const { user } = useAuth();
   const { deleteProject } = useData();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  // ✅ FIX: Safely extract numbers from both naming conventions
-  const totalBudget = safeNumber(project.totalBudget || (project as any).total_budget);
+  
+  // ✅ FIX: Extract all values safely (exactly like petty cash does with transaction.date)
+  const projectData = project as any;
+  
+  const totalBudget = safeNumber(projectData.totalBudget ?? projectData.total_budget);
   const totalExpenses = safeNumber(stats.totalExpenses);
   const spentPercentage = totalBudget > 0 ? (totalExpenses / totalBudget) * 100 : 0;
+  
+  // ✅ CRITICAL: Use ?? (nullish coalescing) instead of || to handle falsy values better
+  const startDate = projectData.startDate ?? projectData.start_date;
+  const endDate = projectData.endDate ?? projectData.end_date;
+  const createdAt = projectData.createdAt ?? projectData.created_at;
+  const clientName = projectData.clientName ?? projectData.client_name;
+  const name = projectData.name;
+  const location = projectData.location;
+  const description = projectData.description;
+  const status = projectData.status;
 
   const handleDelete = () => {
     deleteProject(project.id);
@@ -52,18 +72,18 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold text-foreground">{project.name}</h3>
+            <h3 className="text-xl font-bold text-foreground">{name}</h3>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
               <MapPin className="w-4 h-4" />
-              {project.location}
+              {location}
             </div>
           </div>
-          <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusColor(project.status)}`}>
-            {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+          <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusColor(status)}`}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
           </span>
         </div>
 
-        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{project.description}</p>
+        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{description}</p>
 
         <div className="space-y-3 mb-6 pb-6 border-b border-border/50">
           <div>
@@ -101,7 +121,19 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
             </div>
             <div>
               <p className="text-muted-foreground">Client</p>
-              <p className="font-semibold text-foreground truncate">{project.clientName}</p>
+              <p className="font-semibold text-foreground truncate">{clientName}</p>
+            </div>
+          </div>
+          
+          {/* ✅ Dates using the extracted values */}
+          <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t border-border/30">
+            <div>
+              <p className="text-muted-foreground">Start Date</p>
+              <p className="font-semibold text-foreground">{formatDate(startDate)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">End Date</p>
+              <p className="font-semibold text-foreground">{formatDate(endDate)}</p>
             </div>
           </div>
         </div>
@@ -146,7 +178,7 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
             <div className="p-8">
               <h2 className="text-2xl font-bold mb-2 text-foreground">Delete Project?</h2>
               <p className="text-muted-foreground mb-6">
-                Are you sure you want to delete "{project.name}"? This action cannot be undone.
+                Are you sure you want to delete "{name}"? This action cannot be undone.
               </p>
               <div className="flex gap-4">
                 <Button
