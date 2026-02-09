@@ -55,7 +55,7 @@ export function DashboardStats({
   ];
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:gap-6 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, idx) => {
         const Icon = stat.icon;
         return (
@@ -63,16 +63,16 @@ export function DashboardStats({
             key={idx}
             className="border-border/50 hover:border-primary/30 transition overflow-hidden"
           >
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">{stat.label}</p>
-                  <p className="text-3xl font-bold text-foreground">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-muted-foreground mb-1 sm:mb-2 truncate">{stat.label}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-foreground truncate">
                     {formatAmount(stat.value)}
                   </p>
                 </div>
-                <div className={`${stat.bgColor} p-3 rounded-lg`}>
-                  <Icon className={`w-6 h-6 ${stat.textColor}`} />
+                <div className={`${stat.bgColor} p-2 sm:p-3 rounded-lg flex-shrink-0 ml-3`}>
+                  <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.textColor}`} />
                 </div>
               </div>
             </div>

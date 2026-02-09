@@ -32,20 +32,21 @@ export default function ProjectsPage() {
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
         <DashboardHeader user={user!} />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
           <Button
             variant="ghost"
             onClick={() => router.push('/dashboard')}
-            className="mb-6 gap-2"
+            className="mb-4 sm:mb-6 gap-2"
+            size="sm"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </Button>
 
           {/* Header Section */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8 gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-foreground">All Projects</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">All Projects</h2>
               <p className="text-muted-foreground mt-1">
                 Manage and view all construction projects
               </p>
@@ -53,10 +54,10 @@ export default function ProjectsPage() {
             {user?.role === 'admin' && (
               <Button
                 onClick={() => router.push('/dashboard/projects/create')}
-                size="lg"
-                className="gap-2"
+                size="sm"
+                className="gap-2 w-full sm:w-auto"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 New Project
               </Button>
             )}
@@ -64,26 +65,26 @@ export default function ProjectsPage() {
 
           {/* Statistics */}
           {projects.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-4 mb-8">
-              <Card className="p-6 border-border/50">
+            <div className="grid gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 mb-6 sm:mb-8">
+              <Card className="p-4 sm:p-6 border-border/50">
                 <p className="text-sm text-muted-foreground mb-2">Total Projects</p>
-                <p className="text-3xl font-bold text-foreground">{projects.length}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-foreground">{projects.length}</p>
               </Card>
-              <Card className="p-6 border-border/50">
+              <Card className="p-4 sm:p-6 border-border/50">
                 <p className="text-sm text-muted-foreground mb-2">Active</p>
-                <p className="text-3xl font-bold text-green-600">
+                <p className="text-2xl sm:text-3xl font-bold text-green-600">
                   {projects.filter((p) => p.status === 'active').length}
                 </p>
               </Card>
-              <Card className="p-6 border-border/50">
+              <Card className="p-4 sm:p-6 border-border/50">
                 <p className="text-sm text-muted-foreground mb-2">Total Budget</p>
-                <p className="text-3xl font-bold text-foreground">
+                <p className="text-xl sm:text-3xl font-bold text-foreground truncate">
                   ₵{(projects.reduce((sum, p) => sum + safeNumber(p.totalBudget), 0) / 1000000).toFixed(1)}M
                 </p>
               </Card>
-              <Card className="p-6 border-border/50">
+              <Card className="p-4 sm:p-6 border-border/50">
                 <p className="text-sm text-muted-foreground mb-2">Total Spent</p>
-                <p className="text-3xl font-bold text-orange-600">
+                <p className="text-xl sm:text-3xl font-bold text-orange-600 truncate">
                   ₵{(state.expenses.reduce((sum, e) => sum + e.amount, 0) / 1000000).toFixed(1)}M
                 </p>
               </Card>
@@ -92,19 +93,19 @@ export default function ProjectsPage() {
 
           {/* Projects Grid */}
           {projects.length === 0 ? (
-            <Card className="p-12 text-center border-primary/20">
-              <h3 className="text-xl font-semibold mb-2">No Projects Yet</h3>
+            <Card className="p-8 sm:p-12 text-center border-primary/20">
+              <h3 className="text-lg sm:text-xl font-semibold mb-2">No Projects Yet</h3>
               <p className="text-muted-foreground mb-6">
                 Get started by creating your first construction project.
               </p>
               {user?.role === 'admin' && (
-                <Button onClick={() => router.push('/dashboard/projects/create')}>
+                <Button onClick={() => router.push('/dashboard/projects/create')} size="sm">
                   Create Project
                 </Button>
               )}
             </Card>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {projects.map((project) => (
                 <ProjectCard
                   key={project.id}

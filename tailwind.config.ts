@@ -10,6 +10,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      screens: {
+        'xs': '475px', // Extra small screens
+        '3xl': '1600px', // Large desktop screens
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

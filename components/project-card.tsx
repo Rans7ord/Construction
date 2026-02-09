@@ -69,23 +69,23 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition border-border/50 hover:border-primary/30">
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="text-xl font-bold text-foreground">{name}</h3>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg sm:text-xl font-bold text-foreground truncate">{name}</h3>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-              <MapPin className="w-4 h-4" />
-              {location}
+              <MapPin className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{location}</span>
             </div>
           </div>
-          <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusColor(status)}`}>
+          <span className={`text-xs px-2 sm:px-3 py-1 rounded-full font-medium flex-shrink-0 ml-2 ${getStatusColor(status)}`}>
             {status.charAt(0).toUpperCase() + status.slice(1)}
           </span>
         </div>
 
         <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{description}</p>
 
-        <div className="space-y-3 mb-6 pb-6 border-b border-border/50">
+        <div className="space-y-3 mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-border/50">
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">Budget Usage</span>
@@ -102,13 +102,13 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-muted-foreground">Budget</p>
-              <p className="font-semibold text-foreground">
+              <p className="font-semibold text-foreground truncate">
                 {formatAmount(totalBudget)}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Spent</p>
-              <p className="font-semibold text-foreground">
+              <p className="font-semibold text-foreground truncate">
                 {formatAmount(totalExpenses)}
               </p>
             </div>
@@ -124,16 +124,16 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
               <p className="font-semibold text-foreground truncate">{clientName}</p>
             </div>
           </div>
-          
+
           {/* ✅ Dates using the extracted values */}
           <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t border-border/30">
             <div>
               <p className="text-muted-foreground">Start Date</p>
-              <p className="font-semibold text-foreground">{formatDate(startDate)}</p>
+              <p className="font-semibold text-foreground truncate">{formatDate(startDate)}</p>
             </div>
             <div>
               <p className="text-muted-foreground">End Date</p>
-              <p className="font-semibold text-foreground">{formatDate(endDate)}</p>
+              <p className="font-semibold text-foreground truncate">{formatDate(endDate)}</p>
             </div>
           </div>
         </div>
@@ -141,10 +141,12 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
         <div className="flex gap-2">
           <Button
             onClick={() => router.push(`/dashboard/projects/${project.id}`)}
-            className="flex-1 gap-2"
+            className="flex-1 gap-2 text-sm sm:text-base"
             variant="default"
+            size="sm"
           >
-            View Details
+            <span className="hidden sm:inline">View Details</span>
+            <span className="sm:hidden">View</span>
             <ArrowRight className="w-4 h-4" />
           </Button>
           {user?.role === 'admin' && (
@@ -152,7 +154,8 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
               <Button
                 onClick={() => router.push(`/dashboard/projects/${project.id}/edit`)}
                 variant="outline"
-                size="icon"
+                size="sm"
+                className="px-2 sm:px-3"
                 title="Edit Project"
               >
                 <Edit2 className="w-4 h-4" />
@@ -160,8 +163,8 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
               <Button
                 onClick={() => setShowDeleteConfirm(true)}
                 variant="outline"
-                size="icon"
-                className="border-destructive text-destructive hover:bg-destructive/10"
+                size="sm"
+                className="px-2 sm:px-3 border-destructive text-destructive hover:bg-destructive/10"
                 title="Delete Project"
               >
                 <Trash2 className="w-4 h-4" />
