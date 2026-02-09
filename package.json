@@ -1,12 +1,13 @@
 {
-  "name": "Construction",
+  "name": "construction",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "migrate": "node -e \"const { POST } = require('./app/api/migrate/route.ts'); POST().then(r => console.log('Migration completed')).catch(console.error)\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

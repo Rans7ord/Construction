@@ -42,6 +42,10 @@ export async function GET(request: NextRequest) {
     let params: any[] = [];
     let conditions: string[] = [];
 
+    // Always filter by company_id
+    conditions.push('pc.company_id = ?');
+    params.push(session.user.companyId);
+
     if (startDate) {
       conditions.push('pc.date >= ?');
       params.push(startDate);
@@ -145,8 +149,8 @@ export async function POST(request: NextRequest) {
     try {
       await execute(
         `INSERT INTO petty_cash (
-          id, amount, description, category, vendor, type, date, added_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, amount, description, category, vendor, type, date, added_by, company_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           transactionId,
           amount,
@@ -155,7 +159,8 @@ export async function POST(request: NextRequest) {
           vendor || null,
           type,
           date,
-          session.user.id
+          session.user.id,
+          session.user.companyId
         ]
       );
     } catch (tableError: any) {
@@ -174,6 +179,7 @@ export async function POST(request: NextRequest) {
             type ENUM('inflow', 'outflow') NOT NULL,
             date DATE NOT NULL,
             added_by VARCHAR(50) NOT NULL,
+            company_id VARCHAR(50) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE RESTRICT,
@@ -181,15 +187,16 @@ export async function POST(request: NextRequest) {
             INDEX idx_type (type),
             INDEX idx_category (category),
             INDEX idx_vendor (vendor),
-            INDEX idx_added_by (added_by)
+            INDEX idx_added_by (added_by),
+            INDEX idx_petty_cash_company (company_id)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
 
         // Now try the insert again
         await execute(
           `INSERT INTO petty_cash (
-            id, amount, description, category, vendor, type, date, added_by
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, amount, description, category, vendor, type, date, added_by, company_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             transactionId,
             amount,
@@ -198,7 +205,8 @@ export async function POST(request: NextRequest) {
             vendor || null,
             type,
             date,
-            session.user.id
+            session.user.id,
+            session.user.companyId
           ]
         );
       } else {

@@ -52,7 +52,7 @@ export default function ReportsPage() {
   const remaining = totalBudget - totalSpent;
 
   const generatePDF = () => {
-    let content = 'BuildManager - Project Report\n';
+    let content = 'Logonvoice - Project Report\n';
     content += '================================\n\n';
 
     if (selectedProject) {
