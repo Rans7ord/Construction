@@ -438,11 +438,11 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <h4 className="font-medium text-foreground mb-2">Supervisor</h4>
-                  <p className="text-sm text-muted-foreground">Read-only access to projects and reports. Cannot modify or delete any data</p>
+                  <p className="text-sm text-muted-foreground">Read and write access to projects and reports. Cannot delete any data</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-foreground mb-2">Staff</h4>
-                  <p className="text-sm text-muted-foreground">Limited access to view project information and create expenses with restrictions</p>
+                  <p className="text-sm text-muted-foreground">Limited access to view project information and submit material requisitions for supervisor approval</p>
                 </div>
               </div>
             </div>

@@ -1,5 +1,3 @@
-//comp
-
 'use client';
 
 import { Expense, ProjectStep } from '@/lib/store';
@@ -12,8 +10,6 @@ import { Plus, Edit2, Trash2, BarChart3 } from 'lucide-react';
 import { ExpenseModal } from './expense-modal';
 import { formatDate } from '@/lib/date-utils';
 
-// Use when displaying expense dates
-
 interface ExpensesSectionProps {
   projectId: string;
   expenses: Expense[];
@@ -25,7 +21,11 @@ export function ExpensesSection({ projectId, expenses, steps }: ExpensesSectionP
   const { deleteExpense } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [filterStep, setFilterStep] = useState<string | null>(null);
+
+  const isAdmin = user?.role === 'admin';
+  const isSupervisor = user?.role === 'supervisor';
+  const canAdd = isAdmin || isSupervisor; // Both admin and supervisor can add
+  const canDelete = isAdmin; // Only admin can delete
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
@@ -38,11 +38,7 @@ export function ExpensesSection({ projectId, expenses, steps }: ExpensesSectionP
     }
   };
 
-  const filteredExpenses = filterStep
-    ? expenses.filter((e) => e.stepId === filterStep)
-    : expenses;
-
-  const total = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
 
   // Group expenses by step
   const expensesByStep = steps.map((step) => ({
@@ -57,7 +53,7 @@ export function ExpensesSection({ projectId, expenses, steps }: ExpensesSectionP
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h3 className="text-lg font-semibold">Expenses by Step</h3>
-        {user?.role === 'admin' && (
+        {canAdd && (
           <Button
             onClick={() => {
               setEditingExpense(null);
@@ -125,8 +121,8 @@ export function ExpensesSection({ projectId, expenses, steps }: ExpensesSectionP
                               ₵{(expense.amount / 1000).toFixed(1)}K
                             </p>
                           </div>
-                          {user?.role === 'admin' && (
-                            <div className="flex gap-2 ml-4 opacity-0 group-hover:opacity-100 transition">
+                          <div className="flex gap-2 ml-4 opacity-0 group-hover:opacity-100 transition">
+                            {isAdmin && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -134,6 +130,9 @@ export function ExpensesSection({ projectId, expenses, steps }: ExpensesSectionP
                               >
                                 <Edit2 className="w-3 h-3" />
                               </Button>
+                            )}
+                            {/* Delete only for admin */}
+                            {canDelete && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -142,8 +141,8 @@ export function ExpensesSection({ projectId, expenses, steps }: ExpensesSectionP
                               >
                                 <Trash2 className="w-3 h-3" />
                               </Button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       ))}
                   </div>

@@ -1,8 +1,53 @@
-
 // app/api/materials/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { execute, query } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only admin and supervisor can approve/update materials
+    if (session.user.role === 'staff') {
+      return NextResponse.json({ error: 'Unauthorized - Staff cannot update material status' }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+    const { status } = body;
+
+    const validStatuses = ['pending', 'ordered', 'received', 'used'];
+    if (!status || !validStatuses.includes(status)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+
+    // Verify the material belongs to user's company
+    const material = await query(
+      `SELECT m.*, p.company_id 
+       FROM materials m 
+       JOIN projects p ON m.project_id = p.id 
+       WHERE m.id = ? AND p.company_id = ?`,
+      [id, session.user.companyId]
+    );
+
+    if (!material || material.length === 0) {
+      return NextResponse.json({ error: 'Material not found or unauthorized' }, { status: 404 });
+    }
+
+    await execute('UPDATE materials SET status = ? WHERE id = ?', [status, id]);
+
+    return NextResponse.json({ message: 'Material status updated successfully', status }, { status: 200 });
+  } catch (error: any) {
+    console.error('[v0] Update material error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  }
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -12,6 +57,11 @@ export async function DELETE(
     const session = await getServerSession();
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only admin can delete materials
+    if (session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized - Only admins can delete materials' }, { status: 403 });
     }
 
     const { id } = await params;
@@ -29,10 +79,7 @@ export async function DELETE(
     }
 
     if (!tableExists) {
-      return NextResponse.json(
-        { error: 'Materials table does not exist' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Materials table does not exist' }, { status: 404 });
     }
 
     // Verify the material belongs to user's company
@@ -45,23 +92,14 @@ export async function DELETE(
     );
 
     if (!material || material.length === 0) {
-      return NextResponse.json(
-        { error: 'Material not found or unauthorized' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Material not found or unauthorized' }, { status: 404 });
     }
 
     await execute('DELETE FROM materials WHERE id = ?', [id]);
 
-    return NextResponse.json(
-      { message: 'Material deleted successfully' },
-      { status: 200 }
-    );
+    return NextResponse.json({ message: 'Material deleted successfully' }, { status: 200 });
   } catch (error: any) {
     console.error('[v0] Delete material error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

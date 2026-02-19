@@ -6,7 +6,7 @@ import { useData } from '@/lib/data-context';
 import { useAuth } from '@/lib/auth-context';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { Plus, Edit2, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { StepModal } from './step-modal';
 
 interface StepsSectionProps {
@@ -16,9 +16,14 @@ interface StepsSectionProps {
 
 export function StepsSection({ projectId, steps }: StepsSectionProps) {
   const { user } = useAuth();
-  const { deleteStep, updateStep } = useData();
+  const { deleteStep } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editingStep, setEditingStep] = useState<ProjectStep | null>(null);
+
+  const isAdmin = user?.role === 'admin';
+  const isSupervisor = user?.role === 'supervisor';
+  const canAdd = isAdmin || isSupervisor; // Both admin and supervisor can add
+  const canDelete = isAdmin; // Only admin can delete
 
   const handleEdit = (step: ProjectStep) => {
     setEditingStep(step);
@@ -46,7 +51,7 @@ export function StepsSection({ projectId, steps }: StepsSectionProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Project Steps</h3>
-        {user?.role === 'admin' && (
+        {canAdd && (
           <Button
             onClick={() => {
               setEditingStep(null);
@@ -93,8 +98,8 @@ export function StepsSection({ projectId, steps }: StepsSectionProps) {
                       Budget: ₵{(step.estimatedBudget / 1000).toFixed(1)}K
                     </p>
                   </div>
-                  {user?.role === 'admin' && (
-                    <div className="flex gap-2">
+                  <div className="flex gap-2">
+                    {isAdmin && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -102,6 +107,9 @@ export function StepsSection({ projectId, steps }: StepsSectionProps) {
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
+                    )}
+                    {/* Delete only for admin */}
+                    {canDelete && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -110,8 +118,8 @@ export function StepsSection({ projectId, steps }: StepsSectionProps) {
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </Card>
             ))}

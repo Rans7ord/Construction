@@ -35,7 +35,7 @@ export function DashboardHeader({ user }: { user: User }) {
               <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-2xl font-bold text-primary truncate">Logonvoice</h1>
+              <h1 className="text-lg sm:text-2xl font-bold text-primary truncate">Workfield</h1>
               <p className="text-xs text-muted-foreground hidden sm:block">Construction Management</p>
             </div>
           </div>

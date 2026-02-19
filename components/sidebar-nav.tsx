@@ -31,13 +31,13 @@ const menuItems = [
     label: 'Petty Cash',
     href: '/dashboard/petty-cash',
     icon: Wallet,
-    roles: ['admin', 'supervisor', 'staff'],
+    roles: ['admin', 'supervisor'], // Staff cannot see Petty Cash
   },
   {
     label: 'Reports',
     href: '/dashboard/reports',
     icon: BarChart3,
-    roles: ['admin', 'supervisor', 'staff'],
+    roles: ['admin', 'supervisor'], // Staff cannot see Reports
   },
   {
     label: 'User Management',

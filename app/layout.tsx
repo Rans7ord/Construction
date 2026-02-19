@@ -8,7 +8,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Logonvoice - Construction Project Management',
+  title: 'Workfield - Construction Project Management',
   description: 'Professional construction project management system with budget tracking, expense management, and reporting',
   generator: 'v0.app',
   icons: {

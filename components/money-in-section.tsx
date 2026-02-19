@@ -21,6 +21,11 @@ export function MoneyInSection({ projectId, moneyIn }: MoneyInSectionProps) {
   const [showModal, setShowModal] = useState(false);
   const [editingMoney, setEditingMoney] = useState<MoneyIn | null>(null);
 
+  const isAdmin = user?.role === 'admin';
+  const isSupervisor = user?.role === 'supervisor';
+  const canAdd = isAdmin || isSupervisor; // Both admin and supervisor can add
+  const canDelete = isAdmin; // Only admin can delete
+
   const total = moneyIn.reduce((sum, m) => sum + m.amount, 0);
 
   const handleEdit = (money: MoneyIn) => {
@@ -38,7 +43,7 @@ export function MoneyInSection({ projectId, moneyIn }: MoneyInSectionProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Budget Allocation (Money In)</h3>
-        {user?.role === 'admin' && (
+        {canAdd && (
           <Button
             onClick={() => {
               setEditingMoney(null);
@@ -91,8 +96,8 @@ export function MoneyInSection({ projectId, moneyIn }: MoneyInSectionProps) {
                       +₵{(money.amount / 1000).toFixed(1)}K
                     </p>
                   </div>
-                  {user?.role === 'admin' && (
-                    <div className="flex gap-2 ml-4">
+                  <div className="flex gap-2 ml-4">
+                    {isAdmin && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -100,6 +105,9 @@ export function MoneyInSection({ projectId, moneyIn }: MoneyInSectionProps) {
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
+                    )}
+                    {/* Delete only for admin */}
+                    {canDelete && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -108,8 +116,8 @@ export function MoneyInSection({ projectId, moneyIn }: MoneyInSectionProps) {
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </Card>
             ))}

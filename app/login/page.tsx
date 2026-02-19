@@ -111,7 +111,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl border-primary/20">
         <div className="p-8">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-primary mb-2">Logonvoice</h1>
+            <h1 className="text-4xl font-bold text-primary mb-2">Workfield</h1>
             <p className="text-muted-foreground">Construction Project Management System</p>
           </div>
 

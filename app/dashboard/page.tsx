@@ -1,3 +1,5 @@
+// FILE LOCATION: app/dashboard/page.tsx
+
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
@@ -26,6 +28,7 @@ export default function DashboardPage() {
 
   if (!mounted) return null;
 
+  const isStaff = user?.role === 'staff';
   const projects = state.projects;
   
   const totalBudget = projects.reduce((sum, p) => {
@@ -41,7 +44,7 @@ export default function DashboardPage() {
   }, 0);
   
   const remaining = totalBudget - totalSpent;
-  const profit = totalIncome * 0.1; // 10% profit
+  const profit = totalIncome * 0.1;
 
   return (
     <ProtectedLayout>
@@ -49,33 +52,41 @@ export default function DashboardPage() {
         <DashboardHeader user={user!} />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-          {/* Statistics Overview */}
-          <DashboardStats
-            totalBudget={totalBudget}
-            totalSpent={totalSpent}
-            totalIncome={totalIncome}
-            remaining={remaining}
-            projectCount={projects.length}
-          />
-
-          {/* Profit Overview */}
-          <div className="mt-6 sm:mt-8">
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4">Financial Summary</h2>
-            <ProfitOverview
-              totalIncome={totalIncome}
+          {/* Statistics Overview - hidden from staff */}
+          {!isStaff && (
+            <DashboardStats
+              totalBudget={totalBudget}
               totalSpent={totalSpent}
-              profit={profit}
+              totalIncome={totalIncome}
               remaining={remaining}
+              projectCount={projects.length}
             />
-          </div>
+          )}
+
+          {/* Profit Overview - hidden from staff */}
+          {!isStaff && (
+            <div className="mt-6 sm:mt-8">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4">Financial Summary</h2>
+              <ProfitOverview
+                totalIncome={totalIncome}
+                totalSpent={totalSpent}
+                profit={profit}
+                remaining={remaining}
+              />
+            </div>
+          )}
 
           {/* Projects Section */}
-          <div className="mt-8 sm:mt-12">
+          <div className={`${!isStaff ? 'mt-8 sm:mt-12' : ''}`}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
               <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Recent Projects</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
+                  {isStaff ? 'Projects' : 'Recent Projects'}
+                </h2>
                 <p className="text-muted-foreground mt-1">
-                  Manage and track your construction projects
+                  {isStaff
+                    ? 'View your assigned projects and submit material requisitions'
+                    : 'Manage and track your construction projects'}
                 </p>
               </div>
               <div className="flex gap-2 flex-wrap">
@@ -106,7 +117,7 @@ export default function DashboardPage() {
               <Card className="p-8 sm:p-12 text-center border-primary/20">
                 <h3 className="text-lg sm:text-xl font-semibold mb-2">No Projects Yet</h3>
                 <p className="text-muted-foreground mb-6">
-                  Get started by creating your first construction project.
+                  {isStaff ? 'No projects available yet.' : 'Get started by creating your first construction project.'}
                 </p>
                 {user?.role === 'admin' && (
                   <Button onClick={() => router.push('/dashboard/projects/create')} size="sm">
