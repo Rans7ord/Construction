@@ -20,6 +20,7 @@ export default function AllProjectsPage() {
 
   const isAdmin = user?.role === 'admin';
   const isStaff = user?.role === 'staff';
+  const canCreateProject = user?.role === 'admin' || user?.role === 'supervisor';
 
   const projects = state.projects;
 
@@ -56,7 +57,7 @@ export default function AllProjectsPage() {
               <h1 className="text-3xl sm:text-4xl font-bold text-foreground">All Projects</h1>
               <p className="text-muted-foreground mt-1">Manage and view all construction projects</p>
             </div>
-            {isAdmin && (
+            {canCreateProject && (
               <Button
                 onClick={() => router.push('/dashboard/projects/create')}
                 className="gap-2 self-start sm:self-auto"
@@ -100,11 +101,11 @@ export default function AllProjectsPage() {
             <Card className="p-12 text-center border-primary/20">
               <h3 className="text-xl font-semibold mb-2">No Projects Yet</h3>
               <p className="text-muted-foreground mb-6">
-                {isAdmin
+                {canCreateProject
                   ? 'Get started by creating your first construction project.'
                   : 'No projects are available yet.'}
               </p>
-              {isAdmin && (
+              {canCreateProject && (
                 <Button onClick={() => router.push('/dashboard/projects/create')}>
                   Create Project
                 </Button>
