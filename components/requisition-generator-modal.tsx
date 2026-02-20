@@ -354,7 +354,7 @@ export default function RequisitionGeneratorModal({
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            Requires <code className="bg-muted px-1 py-0.5 rounded">pdf format</code>
+             <code className="bg-muted px-1 py-0.5 rounded">pdf format</code>
           </p>
         </div>
       </DialogContent>
