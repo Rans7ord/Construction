@@ -99,20 +99,22 @@ export function ProjectCard({ project, stats }: ProjectCardProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground">Budget</p>
-              <p className="font-semibold text-foreground truncate">
-                {formatAmount(totalBudget)}
-              </p>
+          {user?.role !== 'staff' && (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Budget</p>
+                <p className="font-semibold text-foreground truncate">
+                  {formatAmount(totalBudget)}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Spent</p>
+                <p className="font-semibold text-foreground truncate">
+                  {formatAmount(totalExpenses)}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-muted-foreground">Spent</p>
-              <p className="font-semibold text-foreground truncate">
-                {formatAmount(totalExpenses)}
-              </p>
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
