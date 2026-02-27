@@ -1,7 +1,9 @@
+// app/api/projects/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, queryOne } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
 import { snakeToCamel } from '@/lib/transform';
+import { canCreateProject, getSubscriptionStatus } from '@/lib/subscription';
 
 export async function GET() {
   try {
@@ -15,9 +17,7 @@ export async function GET() {
       [session.user.companyId]
     );
 
-    // ✅ FIX: Transform snake_case to camelCase
     return NextResponse.json(snakeToCamel(projects));
-    
   } catch (error) {
     console.error('Get projects error:', error);
     return NextResponse.json(
@@ -34,6 +34,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // ── Subscription / plan limit check ───────────────────────────────────────
+    const allowed = await canCreateProject(session.user.companyId);
+    if (!allowed) {
+      // Fetch status to give a more informative error message
+      const status = await getSubscriptionStatus(session.user.companyId);
+
+      if (!status.isActive) {
+        return NextResponse.json(
+          {
+            error: 'Your trial has expired. Please subscribe to continue creating projects.',
+            code: 'SUBSCRIPTION_EXPIRED',
+          },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error: `Project limit reached for the ${status.plan?.name ?? 'current'} plan. Please upgrade to create more projects.`,
+          code: 'PROJECT_LIMIT_REACHED',
+          currentPlan: status.plan?.name,
+          maxProjects: status.plan?.maxProjects,
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const {
       name,
@@ -45,7 +72,7 @@ export async function POST(request: NextRequest) {
       endDate,
       totalBudget,
       createdBy,
-      status = 'active'
+      status = 'active',
     } = body;
 
     // Validate required fields
@@ -56,10 +83,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique project ID
     const projectId = `proj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const result = await execute(
+    await execute(
       `INSERT INTO projects (
         id, name, location, description, client_name, client_email,
         start_date, end_date, total_budget, created_by, company_id, status
@@ -76,19 +102,16 @@ export async function POST(request: NextRequest) {
         totalBudget,
         createdBy,
         session.user.companyId,
-        status
+        status,
       ]
     );
 
-    // Get the created project
     const project = await queryOne<any>(
       'SELECT * FROM projects WHERE id = ?',
       [projectId]
     );
 
-    // ✅ FIX: Transform snake_case to camelCase before returning
     return NextResponse.json(snakeToCamel(project), { status: 201 });
-
   } catch (error) {
     console.error('Create project error:', error);
     return NextResponse.json(

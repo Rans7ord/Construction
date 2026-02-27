@@ -1,8 +1,10 @@
+// app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
 import { query, queryOne } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from '@/lib/auth';
+import { createTrialSubscription, canAddUser } from '@/lib/subscription';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,36 +40,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ✅ FIX: Check if this is an admin creating a user (authenticated request)
+    // Check if this is an admin creating a team member (authenticated request)
     const session = await getServerSession();
     let companyId: string;
+    let isNewCompany = false;
 
     if (session?.user && session.user.role === 'admin') {
-      // ✅ Admin creating a user - use the admin's company_id
+      // ── Admin adding a team member ─────────────────────────────────────────
       companyId = session.user.companyId;
-      console.log(`[SIGNUP] Admin ${session.user.email} creating user for company ${companyId}`);
+
+      // Enforce user limit based on current subscription plan
+      const allowed = await canAddUser(companyId);
+      if (!allowed) {
+        return NextResponse.json(
+          {
+            error: 'User limit reached for your current plan. Please upgrade to add more team members.',
+            code: 'USER_LIMIT_REACHED',
+          },
+          { status: 403 }
+        );
+      }
+
+      console.log(`[SIGNUP] Admin ${session.user.email} adding user to company ${companyId}`);
     } else {
-      // ✅ Public signup - create a new company
-      companyId = uuidv4();
-      console.log(`[SIGNUP] Public signup - creating new company ${companyId}`);
+      // ── Public signup — brand new company ─────────────────────────────────
+      companyId   = uuidv4();
+      isNewCompany = true;
+      console.log(`[SIGNUP] New company signup, company_id: ${companyId}`);
     }
 
-    // Hash password
+    // Hash password and create user
     const hashedPassword = await bcryptjs.hash(password, 10);
     const userId = uuidv4();
 
-    // Create user
     await query(
       'INSERT INTO users (id, name, email, password, role, company_id) VALUES (?, ?, ?, ?, ?, ?)',
       [userId, name, email, hashedPassword, role, companyId]
     );
+
+    // ── Create 15-day trial for brand-new companies only ──────────────────────
+    if (isNewCompany) {
+      try {
+        await createTrialSubscription(companyId);
+        console.log(`[SIGNUP] 15-day trial created for company ${companyId}`);
+      } catch (trialError) {
+        // Non-fatal — log but don't block signup
+        console.error('[SIGNUP] Failed to create trial subscription:', trialError);
+      }
+    }
 
     return NextResponse.json(
       { message: 'User created successfully', userId },
       { status: 201 }
     );
   } catch (error) {
-    console.error('[v0] Signup error:', error);
+    console.error('[SIGNUP] Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

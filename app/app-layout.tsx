@@ -1,11 +1,12 @@
+// app/app-layout.tsx  (UPDATED — adds TrialBanner)
 'use client';
 
-import React from "react"
-
+import React from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { SidebarNav } from '@/components/sidebar-nav';
+import { TrialBanner } from '@/components/trial-banner';
 
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -14,11 +15,8 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    // ✅ Wait for auth check to complete
     if (!isLoading) {
       if (!user) {
-        // ✅ Only redirect if definitely not authenticated
-        // Use replace instead of push to avoid back button issues
         if (!redirecting) {
           setRedirecting(true);
           router.replace('/login');
@@ -29,24 +27,22 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, router, redirecting]);
 
-  // ✅ Show loading state while checking auth
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // ✅ Don't render anything if not authenticated or redirecting
   if (!user || !shouldRender || redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Checking authentication...</p>
         </div>
       </div>
@@ -57,6 +53,8 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col lg:flex-row min-h-screen">
       <SidebarNav user={user} />
       <div className="flex-1 flex flex-col">
+        {/* Trial / expiry banner — shown to all authenticated users */}
+        <TrialBanner />
         {children}
       </div>
     </div>

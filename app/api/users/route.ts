@@ -1,5 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { query, execute } from '@/lib/db';
+// app/api/users/route.ts
+// NOTE: User CREATION goes through /api/auth/signup which already enforces
+// the canAddUser() plan limit. This file only handles GET (list users).
+// The limit is enforced there so both the admin UI and any direct API
+// calls are protected by the same check.
+
+import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 import { getServerSession } from '@/lib/auth';
 import { snakeToCamel } from '@/lib/transform';
 

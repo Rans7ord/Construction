@@ -1,3 +1,4 @@
+// components/sidebar-nav.tsx  (UPDATED — adds Billing & Plans menu item)
 'use client';
 
 import { User } from '@/lib/store';
@@ -11,6 +12,7 @@ import {
   Menu,
   X,
   Wallet,
+  CreditCard,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -31,19 +33,25 @@ const menuItems = [
     label: 'Petty Cash',
     href: '/dashboard/petty-cash',
     icon: Wallet,
-    roles: ['admin', 'supervisor'], // Staff cannot see Petty Cash
+    roles: ['admin', 'supervisor'],
   },
   {
     label: 'Reports',
     href: '/dashboard/reports',
     icon: BarChart3,
-    roles: ['admin', 'supervisor'], // Staff cannot see Reports
+    roles: ['admin', 'supervisor'],
   },
   {
     label: 'User Management',
     href: '/dashboard/users',
     icon: Users,
     roles: ['admin'],
+  },
+  {
+    label: 'Billing & Plans',
+    href: '/dashboard/billing',
+    icon: CreditCard,
+    roles: ['admin'],  // Only admins can manage billing
   },
 ];
 
@@ -52,7 +60,9 @@ export function SidebarNav({ user }: { user: User }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
-  const filteredItems = menuItems.filter((item) => item.roles.includes(user.role));
+  const filteredItems = menuItems.filter((item) =>
+    item.roles.includes(user.role)
+  );
 
   return (
     <>
@@ -64,7 +74,11 @@ export function SidebarNav({ user }: { user: User }) {
           className="rounded-full w-12 h-12 sm:w-14 sm:h-14 p-0 bg-card border-2 shadow-lg"
           onClick={() => setIsOpen(!isOpen)}
         >
-          {isOpen ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Menu className="w-5 h-5 sm:w-6 sm:h-6" />}
+          {isOpen ? (
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+          ) : (
+            <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+          )}
         </Button>
       </div>
 
@@ -78,16 +92,21 @@ export function SidebarNav({ user }: { user: User }) {
           w-full lg:w-64 flex flex-col
         `}
       >
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {filteredItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
+            const isBilling = item.href === '/dashboard/billing';
 
             return (
               <Button
                 key={item.href}
                 variant={isActive ? 'default' : 'ghost'}
-                className="w-full justify-start gap-3 h-12 text-sm sm:text-base"
+                className={`w-full justify-start gap-3 h-12 text-sm sm:text-base ${
+                  isBilling && !isActive
+                    ? 'text-primary hover:text-primary border border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5'
+                    : ''
+                }`}
                 onClick={() => {
                   router.push(item.href);
                   setIsOpen(false);
