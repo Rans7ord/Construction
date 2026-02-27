@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { queryOne } from '@/lib/db';
+import { getSubscriptionStatus } from '@/lib/subscription';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
       { expiresIn: '24h' }
     );
 
+    // Check subscription status
+    const subscriptionStatus = await getSubscriptionStatus(user.company_id);
+    const isExpired = subscriptionStatus.isExpired;
+
     // Set token in httpOnly cookie
     const response = NextResponse.json(
       {
@@ -65,6 +70,7 @@ export async function POST(request: NextRequest) {
           role: user.role,
           companyId: user.company_id,
         },
+        subscriptionExpired: isExpired,
       },
       { status: 200 }
     );

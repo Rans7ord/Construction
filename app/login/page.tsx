@@ -61,6 +61,9 @@ export default function LoginPage() {
         return;
       }
 
+      // Check if subscription is expired
+      const subscriptionExpired = data.subscriptionExpired;
+
       // ✅ FIX: IMPORTANT: Wait for auth context to update
       const loginSuccess = await login(email, password);
       
@@ -78,8 +81,14 @@ export default function LoginPage() {
       });
       
       if (verifyResponse.ok) {
-        // ✅ Now redirect - auth is confirmed
-        router.push('/dashboard');
+        // ✅ Redirect based on subscription status:
+        // - If expired: go to billing page and prevent leaving until they upgrade
+        // - Otherwise: go to dashboard
+        if (subscriptionExpired) {
+          router.push('/dashboard/billing');
+        } else {
+          router.push('/dashboard');
+        }
       } else {
         setError('Authentication verification failed. Please try again.');
       }
