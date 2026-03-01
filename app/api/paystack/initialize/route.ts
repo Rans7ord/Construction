@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
-/** Pull a readable message out of any thrown value */
 function errMsg(e: unknown): string {
   if (e instanceof Error) return `${e.name}: ${e.message}\n${e.stack ?? ''}`;
   return String(e);
@@ -39,9 +38,12 @@ export async function POST(request: NextRequest) {
 
   // ── Parse body ────────────────────────────────────────────────────────────
   let planId: string;
+  let months: number;
   try {
     const body = await request.json();
     planId = body?.planId;
+    // months defaults to 1 if not provided
+    months = Math.max(1, Math.min(12, parseInt(body?.months ?? '1', 10)));
   } catch (e) {
     console.error('[paystack/initialize] ❌ Failed to parse request body:', errMsg(e));
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
@@ -69,25 +71,26 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Build reference & amount ──────────────────────────────────────────────
-  const reference     = `wf_${uuidv4().replace(/-/g, '').substring(0, 20)}`;
-  const priceGhs      = Number(plan.price ?? 0);
-  const amountPesewas = Math.round(priceGhs * 100);
+  const reference      = `wf_${uuidv4().replace(/-/g, '').substring(0, 20)}`;
+  const priceGhsMonthly = Number(plan.price ?? 0);
+  const totalPriceGhs  = priceGhsMonthly * months;           // multiply by months
+  const amountPesewas  = Math.round(totalPriceGhs * 100);
 
-  console.log(`[paystack/initialize] plan="${plan.name}" price=${priceGhs} ref=${reference} companyId=${companyId}`);
+  console.log(
+    `[paystack/initialize] plan="${plan.name}" months=${months} ` +
+    `unitPrice=${priceGhsMonthly} total=${totalPriceGhs} ref=${reference} companyId=${companyId}`
+  );
 
   // ── Insert pending transaction ────────────────────────────────────────────
-  // NOTE: If you see "Cannot add or update a child row: a foreign key constraint fails"
-  // here, run fix-fk-patch.sql — payment_transactions.company_id had a bad FK to users(id).
   try {
     await execute(
       `INSERT INTO payment_transactions
          (id, company_id, plan_id, paystack_ref, amount, status)
        VALUES (?, ?, ?, ?, ?, 'pending')`,
-      [uuidv4(), companyId, planId, reference, priceGhs]
+      [uuidv4(), companyId, planId, reference, totalPriceGhs]
     );
   } catch (e) {
     console.error('[paystack/initialize] ❌ DB error inserting transaction:', errMsg(e));
-    console.error('  Values attempted:', { companyId, planId, reference, priceGhs });
     return NextResponse.json({ error: 'Failed to record payment. Try again.' }, { status: 500 });
   }
 
@@ -110,6 +113,7 @@ export async function POST(request: NextRequest) {
           plan_id:    planId,
           plan_name:  plan.name,
           user_id:    userId,
+          months,                      // ← stored in metadata for verify route
         },
         callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?verify=true`,
       }),
@@ -133,7 +137,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Success ───────────────────────────────────────────────────────────────
-  console.log(`[paystack/initialize] ✅ Initialized. ref=${reference}`);
+  console.log(`[paystack/initialize] ✅ Initialized. ref=${reference} months=${months}`);
 
   return NextResponse.json({
     authorization_url: paystackData.data.authorization_url,

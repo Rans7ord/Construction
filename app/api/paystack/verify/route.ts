@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth';
 import { execute, queryOne } from '@/lib/db';
-import { activatePaidSubscription } from '@/lib/subscription';
+import { activatePaidSubscription, extendPaidSubscription } from '@/lib/subscription';
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'reference is required' }, { status: 400 });
   }
 
-  // ── Look up transaction — column is "paystack_ref" ────────────────────────
+  // ── Look up transaction ───────────────────────────────────────────────────
   let tx: any;
   try {
     tx = await queryOne<any>(
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   // ── Verify with Paystack ──────────────────────────────────────────────────
   let paystackData: any;
   try {
-    const res  = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+    const res = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` },
     });
     paystackData = await res.json();
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Could not reach Paystack. Try again.' }, { status: 502 });
   }
 
-  // ── Payment failed or rejected ────────────────────────────────────────────
+  // ── Payment failed ────────────────────────────────────────────────────────
   if (!paystackData?.status || paystackData.data?.status !== 'success') {
     console.error('[paystack/verify] ❌ Payment not successful:', paystackData?.data?.status);
     try {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Payment was not successful' }, { status: 400 });
   }
 
-  // ── Mark transaction success — columns: status, paid_at ──────────────────
+  // ── Mark transaction success ──────────────────────────────────────────────
   try {
     await execute(
       `UPDATE payment_transactions
@@ -95,24 +95,58 @@ export async function POST(request: NextRequest) {
     );
   } catch (e) {
     console.error('[paystack/verify] ❌ DB error marking success:', errMsg(e));
-    // Non-fatal — still activate subscription
+    // Non-fatal — still activate
   }
 
-  // ── Activate subscription ─────────────────────────────────────────────────
-  const customerCode = paystackData.data.customer?.customer_code ?? null;
+  // ── Resolve months from Paystack metadata ─────────────────────────────────
+  const months: number = Math.max(
+    1,
+    parseInt(paystackData.data?.metadata?.months ?? '1', 10)
+  );
+  const customerCode   = paystackData.data.customer?.customer_code ?? null;
+  const companyId      = session.user.companyId;
+  const planId         = tx.plan_id;
+
+  // ── Check if user already has an active subscription ─────────────────────
+  let existingSub: any;
   try {
-    await activatePaidSubscription(session.user.companyId, tx.plan_id, customerCode);
+    existingSub = await queryOne<any>(
+      `SELECT status, current_period_end FROM subscriptions
+       WHERE company_id = ? AND status = 'active'`,
+      [companyId]
+    );
   } catch (e) {
-    console.error('[paystack/verify] ❌ Failed to activate subscription:', errMsg(e));
-    return NextResponse.json({ error: 'Payment received but failed to activate plan. Contact support.' }, { status: 500 });
+    console.error('[paystack/verify] ❌ DB error checking existing sub:', errMsg(e));
+  }
+
+  try {
+    if (existingSub) {
+      // Active sub exists → extend/queue
+      await extendPaidSubscription(companyId, planId, months, reference);
+      console.log(
+        `[paystack/verify] ✅ Queued/extended ${months} month(s) of plan ${planId} ` +
+        `for company ${companyId}`
+      );
+    } else {
+      // No active sub → activate immediately
+      await activatePaidSubscription(companyId, planId, customerCode);
+      console.log(`[paystack/verify] ✅ Activated plan ${planId} for company ${companyId}`);
+    }
+  } catch (e) {
+    console.error('[paystack/verify] ❌ Failed to activate/extend subscription:', errMsg(e));
+    return NextResponse.json(
+      { error: 'Payment received but failed to activate plan. Contact support.' },
+      { status: 500 }
+    );
   }
 
   // ── Respond ───────────────────────────────────────────────────────────────
-  const plan = await queryOne<any>('SELECT name FROM plans WHERE id = ?', [tx.plan_id]);
-  console.log(`[paystack/verify] ✅ Activated ${plan?.name} for company ${session.user.companyId}`);
+  const plan = await queryOne<any>('SELECT name FROM plans WHERE id = ?', [planId]);
+  const msg  = existingSub
+    ? `Payment confirmed! ${months} month${months > 1 ? 's' : ''} of ${plan?.name ?? ''} queued.`
+    : `Payment confirmed! Your ${plan?.name ?? ''} plan is now active.`;
 
-  return NextResponse.json({
-    success: true,
-    message: `Payment confirmed! Your ${plan?.name ?? ''} plan is now active.`,
-  });
+  console.log(`[paystack/verify] ✅ Done. companyId=${companyId} months=${months}`);
+
+  return NextResponse.json({ success: true, message: msg });
 }

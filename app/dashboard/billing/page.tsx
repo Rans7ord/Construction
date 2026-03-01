@@ -11,16 +11,17 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
   CheckCircle2, Crown, Zap, Building2, ArrowLeft,
-  CreditCard, Clock, ShieldCheck, AlertCircle,
+  CreditCard, Clock, ShieldCheck, AlertCircle, CalendarDays,
+  ChevronRight, Layers,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
   id: string;
   name: string;
-  price: number;          // ← API returns "price", NOT "priceMonthly"
-  maxProjects: number;    // 0 = unlimited
-  maxUsers: number;       // 0 = unlimited
+  price: number;
+  maxProjects: number;
+  maxUsers: number;
   features: Record<string, boolean>;
 }
 
@@ -38,17 +39,39 @@ interface SubscriptionStatus {
   plan: Plan | null;
 }
 
+interface QueuedSubscription {
+  id: string;
+  planId: string;
+  months: number;
+  startsAt: string;
+  endsAt: string;
+  status: 'pending' | 'active' | 'cancelled';
+  plan?: Plan;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
-/** Derive a slug from plan name, e.g. "Professional" → "professional" */
 function toSlug(name: string): string {
   return (name ?? '').toLowerCase().trim();
 }
 
-/** Format a number safely — never throws on undefined/null */
 function safeFmt(val: number | null | undefined): string {
   const n = Number(val ?? 0);
   return isNaN(n) ? '0' : n.toLocaleString();
 }
+
+function fmtDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'N/A';
+  return new Date(dateStr).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+
+const MONTH_OPTIONS = [
+  { value: 1,  label: '1 Month'  },
+  { value: 3,  label: '3 Months', savings: '0%'  },
+  { value: 6,  label: '6 Months', savings: '5%'  },
+  { value: 12, label: '12 Months', savings: '10%' },
+];
 
 // ── Static display data ───────────────────────────────────────────────────────
 const PLAN_HIGHLIGHTS: Record<string, string[]> = {
@@ -79,9 +102,9 @@ const PLAN_HIGHLIGHTS: Record<string, string[]> = {
 };
 
 const PLAN_ICONS: Record<string, React.ReactNode> = {
-  starter:      <Zap      className="w-6 h-6" />,
+  starter:      <Zap       className="w-6 h-6" />,
   professional: <Building2 className="w-6 h-6" />,
-  enterprise:   <Crown    className="w-6 h-6" />,
+  enterprise:   <Crown     className="w-6 h-6" />,
 };
 
 const PLAN_CARD_COLORS: Record<string, string> = {
@@ -102,18 +125,147 @@ const PLAN_TAGLINES: Record<string, string> = {
   enterprise:   'Enterprises',
 };
 
-// ── Inner page (uses useSearchParams — must be inside Suspense) ───────────────
+// ── Subscription Timeline Component ──────────────────────────────────────────
+function SubscriptionTimeline({
+  status,
+  queue,
+}: {
+  status: SubscriptionStatus;
+  queue: QueuedSubscription[];
+}) {
+  if (!status.subscription && queue.length === 0) return null;
+
+  const entries: { label: string; planName: string; start: string; end: string; badge: string; badgeColor: string }[] = [];
+
+  // Current subscription
+  if (status.subscription && status.plan) {
+    const isTrial = status.isTrial;
+    entries.push({
+      label:      isTrial ? 'Free Trial' : 'Current Plan',
+      planName:   status.plan.name,
+      start:      isTrial
+        ? fmtDate(status.subscription.trialEndsAt ? undefined : undefined)
+        : fmtDate(status.subscription.currentPeriodEnd ? undefined : undefined),
+      end:        isTrial
+        ? fmtDate(status.subscription.trialEndsAt)
+        : fmtDate(status.subscription.currentPeriodEnd),
+      badge:      isTrial ? 'Trial' : 'Active',
+      badgeColor: isTrial ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700',
+    });
+  }
+
+  // Queued entries
+  for (const q of queue) {
+    entries.push({
+      label:      'Upcoming Plan',
+      planName:   q.plan?.name ?? q.planId,
+      start:      fmtDate(q.startsAt),
+      end:        fmtDate(q.endsAt),
+      badge:      `${q.months} mo`,
+      badgeColor: 'bg-blue-100 text-blue-700',
+    });
+  }
+
+  if (entries.length === 0) return null;
+
+  return (
+    <Card className="p-6 mb-10 border-border/50">
+      <div className="flex items-center gap-2 mb-5">
+        <Layers className="w-5 h-5 text-primary" />
+        <h2 className="text-lg font-semibold">Subscription Timeline</h2>
+      </div>
+
+      <div className="relative">
+        {/* Vertical line */}
+        {entries.length > 1 && (
+          <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-border" />
+        )}
+
+        <div className="space-y-4">
+          {entries.map((entry, i) => (
+            <div key={i} className="flex items-start gap-4">
+              {/* Dot */}
+              <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                i === 0 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+              }`}>
+                <CalendarDays className="w-4 h-4" />
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0 pt-1">
+                <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                  <span className="font-semibold text-foreground">{entry.planName}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${entry.badgeColor}`}>
+                    {entry.badge}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{entry.label}</span>
+                </div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  {i === 0 ? 'Ends' : 'Starts'} {i === 0 ? entry.end : entry.start}
+                  {i > 0 && (
+                    <>
+                      <ChevronRight className="w-3 h-3" />
+                      Ends {entry.end}
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── Month Selector Component ──────────────────────────────────────────────────
+function MonthSelector({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {MONTH_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`relative px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+            value === opt.value
+              ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+              : 'border-border bg-background text-foreground hover:border-primary/50'
+          }`}
+        >
+          {opt.label}
+          {opt.savings && (
+            <span className={`ml-1 text-xs ${
+              value === opt.value ? 'text-primary-foreground/80' : 'text-green-600'
+            }`}>
+              Save {opt.savings}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Inner page ────────────────────────────────────────────────────────────────
 function BillingContent() {
-  const { user } = useAuth();
-  const router      = useRouter();
+  const { user }     = useAuth();
+  const router       = useRouter();
   const searchParams = useSearchParams();
 
-  const [plans,   setPlans]   = useState<Plan[]>([]);
-  const [status,  setStatus]  = useState<SubscriptionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [paying,  setPaying]  = useState<string | null>(null); // planId currently processing
+  const [plans,       setPlans]       = useState<Plan[]>([]);
+  const [status,      setStatus]      = useState<SubscriptionStatus | null>(null);
+  const [queue,       setQueue]       = useState<QueuedSubscription[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [paying,      setPaying]      = useState<string | null>(null);
+  const [monthsMap,   setMonthsMap]   = useState<Record<string, number>>({}); // planId → months
 
-  // ── Verify payment if Paystack redirected back ────────────────────────────
+  // ── Verify payment on redirect back ──────────────────────────────────────
   useEffect(() => {
     const shouldVerify = searchParams.get('verify');
     const reference    = searchParams.get('reference') ?? searchParams.get('trxref');
@@ -121,22 +273,25 @@ function BillingContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Load plans + subscription status ─────────────────────────────────────
-  useEffect(() => {
-    Promise.all([
+  // ── Load data ─────────────────────────────────────────────────────────────
+  const loadData = () => {
+    return Promise.all([
       fetch('/api/plans').then((r) => r.json()),
       fetch('/api/subscriptions').then((r) => r.json()),
+      fetch('/api/subscriptions/queue').then((r) => r.json()),
     ])
-      .then(([p, s]) => {
-        // p may come back as an object on error — guard array
+      .then(([p, s, q]) => {
         setPlans(Array.isArray(p) ? p : []);
         setStatus(s && typeof s === 'object' && !s.error ? s : null);
+        setQueue(Array.isArray(q) ? q : []);
       })
       .catch(() => toast.error('Failed to load billing info'))
       .finally(() => setLoading(false));
-  }, []);
+  };
 
-  // ── Verify payment with backend ───────────────────────────────────────────
+  useEffect(() => { loadData(); }, []);
+
+  // ── Verify payment ────────────────────────────────────────────────────────
   const verifyPayment = async (reference: string) => {
     try {
       const res  = await fetch('/api/paystack/verify', {
@@ -146,10 +301,8 @@ function BillingContent() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(data.message ?? 'Payment confirmed! Your plan is now active.');
-        fetch('/api/subscriptions').then((r) => r.json()).then((s) => {
-          if (s && !s.error) setStatus(s);
-        });
+        toast.success(data.message ?? 'Payment confirmed!');
+        loadData();
       } else {
         toast.error(data.error ?? 'Payment verification failed.');
       }
@@ -158,14 +311,15 @@ function BillingContent() {
     }
   };
 
-  // ── Start Paystack checkout ───────────────────────────────────────────────
+  // ── Checkout ──────────────────────────────────────────────────────────────
   const handleUpgrade = async (planId: string) => {
+    const months = monthsMap[planId] ?? 1;
     setPaying(planId);
     try {
       const res  = await fetch('/api/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, months }),
       });
       const data = await res.json();
       if (data.authorization_url) {
@@ -180,7 +334,11 @@ function BillingContent() {
     }
   };
 
-  // ── Loading spinner ───────────────────────────────────────────────────────
+  const setMonths = (planId: string, val: number) => {
+    setMonthsMap((prev) => ({ ...prev, [planId]: val }));
+  };
+
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <ProtectedLayout>
@@ -197,10 +355,10 @@ function BillingContent() {
   const isExpired       = status?.isExpired  ?? false;
   const daysLeft        = status?.daysLeftInTrial ?? 0;
   const trialEndDate    = status?.subscription?.trialEndsAt
-    ? new Date(status.subscription.trialEndsAt).toLocaleDateString()
+    ? fmtDate(status.subscription.trialEndsAt)
     : 'soon';
   const nextBillingDate = status?.subscription?.currentPeriodEnd
-    ? new Date(status.subscription.currentPeriodEnd).toLocaleDateString()
+    ? fmtDate(status.subscription.currentPeriodEnd)
     : 'N/A';
 
   return (
@@ -214,7 +372,7 @@ function BillingContent() {
             Back
           </Button>
 
-          {/* ── Page header ─────────────────────────────────────────────── */}
+          {/* ── Page header ───────────────────────────────────────────────── */}
           <div className="mb-10">
             <h1 className="text-4xl font-bold text-foreground">Billing &amp; Plans</h1>
             <p className="text-muted-foreground mt-2">
@@ -222,8 +380,8 @@ function BillingContent() {
             </p>
           </div>
 
-          {/* ── Current subscription card ────────────────────────────────── */}
-          <Card className={`p-6 mb-10 border-2 ${
+          {/* ── Current subscription status card ──────────────────────────── */}
+          <Card className={`p-6 mb-6 border-2 ${
             isExpired
               ? 'border-destructive/50 bg-destructive/5'
               : 'border-primary/20 bg-primary/5'
@@ -254,7 +412,7 @@ function BillingContent() {
                       ? 'Please upgrade to regain access to your projects and data.'
                       : isOnTrial
                       ? `Trial ends ${trialEndDate}. No credit card required during trial.`
-                      : `Next billing: ${nextBillingDate}`}
+                      : `Active until ${nextBillingDate}`}
                   </p>
                 </div>
               </div>
@@ -270,11 +428,18 @@ function BillingContent() {
             </div>
           </Card>
 
-          {/* ── Plans grid ──────────────────────────────────────────────── */}
+          {/* ── Subscription Timeline ─────────────────────────────────────── */}
+          <SubscriptionTimeline status={status!} queue={queue} />
+
+          {/* ── Plans grid ────────────────────────────────────────────────── */}
           <div className="mb-4">
-            <h2 className="text-2xl font-bold text-foreground">Choose Your Plan</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              {status?.isActive && !isOnTrial ? 'Extend or Change Plan' : 'Choose Your Plan'}
+            </h2>
             <p className="text-muted-foreground mt-1">
-              All new accounts include a 15-day free trial
+              {status?.isActive && !isOnTrial
+                ? 'Purchase months now — they stack onto your current subscription end date.'
+                : 'All new accounts include a 15-day free trial'}
             </p>
           </div>
 
@@ -290,8 +455,9 @@ function BillingContent() {
                 const slug      = toSlug(plan.name);
                 const isCurrent = slug === currentPlanSlug && !isOnTrial && !isExpired;
                 const isPopular = slug === 'professional';
-                // Safely coerce price — guard against undefined
                 const price     = Number(plan.price ?? 0);
+                const months    = monthsMap[plan.id] ?? 1;
+                const total     = price * months;
 
                 return (
                   <Card
@@ -331,8 +497,8 @@ function BillingContent() {
                         </div>
                       </div>
 
-                      {/* Price — uses safeFmt so toLocaleString is never called on undefined */}
-                      <div className="mb-6">
+                      {/* Price display */}
+                      <div className="mb-4">
                         <div className="flex items-baseline gap-1">
                           <span className="text-3xl font-bold">
                             GHS {safeFmt(price)}
@@ -350,8 +516,28 @@ function BillingContent() {
                         </p>
                       </div>
 
+                      {/* Month selector */}
+                      <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          How many months?
+                        </p>
+                        <MonthSelector
+                          value={months}
+                          onChange={(v) => setMonths(plan.id, v)}
+                        />
+                        {months > 1 && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Total:{' '}
+                            <span className="font-semibold text-foreground">
+                              GHS {safeFmt(total)}
+                            </span>
+                            {' '}for {months} months
+                          </p>
+                        )}
+                      </div>
+
                       {/* Feature list */}
-                      <ul className="space-y-2 mb-8">
+                      <ul className="space-y-2 mb-6">
                         {(PLAN_HIGHLIGHTS[slug] ?? []).map((feat) => (
                           <li key={feat} className="flex items-start gap-2 text-sm">
                             <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
@@ -360,30 +546,35 @@ function BillingContent() {
                         ))}
                       </ul>
 
-                      {/* CTA button */}
-                      {isCurrent ? (
-                        <Button variant="outline" disabled className="w-full">
-                          Current Plan
-                        </Button>
-                      ) : (
-                        <Button
-                          className="w-full"
-                          variant={isPopular ? 'default' : 'outline'}
-                          disabled={paying === plan.id}
-                          onClick={() => handleUpgrade(plan.id)}
-                        >
-                          {paying === plan.id ? (
-                            <span className="flex items-center gap-2">
-                              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              Redirecting...
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-2">
-                              <CreditCard className="w-4 h-4" />
-                              {isExpired || isOnTrial ? 'Subscribe Now' : 'Upgrade'}
-                            </span>
-                          )}
-                        </Button>
+                      {/* CTA */}
+                      <Button
+                        className="w-full"
+                        variant={isPopular ? 'default' : 'outline'}
+                        disabled={paying === plan.id}
+                        onClick={() => handleUpgrade(plan.id)}
+                      >
+                        {paying === plan.id ? (
+                          <span className="flex items-center gap-2">
+                            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Redirecting...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4" />
+                            {isCurrent
+                              ? `Extend ${months} Month${months > 1 ? 's' : ''}`
+                              : isExpired || isOnTrial
+                              ? 'Subscribe Now'
+                              : `Add ${months} Month${months > 1 ? 's' : ''}`}
+                          </span>
+                        )}
+                      </Button>
+
+                      {/* Queued indicator */}
+                      {queue.some((q) => q.planId === plan.id) && (
+                        <p className="text-xs text-center text-blue-600 mt-2 font-medium">
+                          ✓ {queue.filter((q) => q.planId === plan.id).length} purchase(s) queued
+                        </p>
                       )}
                     </div>
                   </Card>
@@ -392,7 +583,7 @@ function BillingContent() {
             </div>
           )}
 
-          {/* ── Trust badge ──────────────────────────────────────────────── */}
+          {/* ── Trust badge ───────────────────────────────────────────────── */}
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-10">
             <ShieldCheck className="w-4 h-4" />
             <span>
@@ -400,18 +591,18 @@ function BillingContent() {
             </span>
           </div>
 
-          {/* ── FAQ ──────────────────────────────────────────────────────── */}
+          {/* ── FAQ ───────────────────────────────────────────────────────── */}
           <Card className="p-8 border-border/50">
             <h2 className="text-xl font-bold mb-6">Frequently Asked Questions</h2>
             <div className="grid md:grid-cols-2 gap-6">
               {[
                 {
-                  q: 'How does the free trial work?',
-                  a: 'Every new account gets 15 days free on the Starter plan — no credit card required. You can upgrade any time.',
+                  q: 'How does stacking months work?',
+                  a: 'When you buy additional months while on an active plan, they queue onto your current end date. Your new plan or extra months begin exactly when your current one ends.',
                 },
                 {
-                  q: 'Can I upgrade or downgrade anytime?',
-                  a: 'Yes. Upgrades take effect immediately. Downgrades apply at the end of your current billing period.',
+                  q: 'Can I switch plans before my current one ends?',
+                  a: 'Yes. Select a different plan, choose how many months, and pay. The new plan will be queued to start the day your current plan ends.',
                 },
                 {
                   q: 'What happens to my data if I expire?',
@@ -435,7 +626,7 @@ function BillingContent() {
   );
 }
 
-// ── Export wrapped in Suspense (required for useSearchParams) ─────────────────
+// ── Export ────────────────────────────────────────────────────────────────────
 export default function BillingPage() {
   return (
     <Suspense>

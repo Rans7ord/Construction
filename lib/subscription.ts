@@ -38,6 +38,18 @@ export interface Subscription {
   plan?: Plan;
 }
 
+export interface QueuedSubscription {
+  id: string;
+  companyId: string;
+  planId: string;
+  months: number;
+  startsAt: string;
+  endsAt: string;
+  paystackRef: string | null;
+  status: 'pending' | 'active' | 'cancelled';
+  plan?: Plan;
+}
+
 export interface SubscriptionStatus {
   isActive: boolean;
   isTrial: boolean;
@@ -161,14 +173,14 @@ export async function getSubscriptionStatus(companyId: string): Promise<Subscrip
 export async function canCreateProject(
   companyId: string
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const status     = await getSubscriptionStatus(companyId);
+  const status = await getSubscriptionStatus(companyId);
 
   if (!status.isActive) {
     return { allowed: false, reason: 'Your subscription has expired. Please upgrade to continue.' };
   }
 
   const maxProjects = status.plan?.maxProjects ?? 3;
-  if (maxProjects === 0) return { allowed: true }; // 0 = unlimited
+  if (maxProjects === 0) return { allowed: true };
 
   const rows  = await query<any>('SELECT COUNT(*) AS cnt FROM projects WHERE company_id = ?', [companyId]);
   const count = Number(rows[0]?.cnt ?? 0);
@@ -186,14 +198,14 @@ export async function canCreateProject(
 export async function canAddUser(
   companyId: string
 ): Promise<{ allowed: boolean; reason?: string }> {
-  const status  = await getSubscriptionStatus(companyId);
+  const status = await getSubscriptionStatus(companyId);
 
   if (!status.isActive) {
     return { allowed: false, reason: 'Your subscription has expired. Please upgrade to continue.' };
   }
 
   const maxUsers = status.plan?.maxUsers ?? 2;
-  if (maxUsers === 0) return { allowed: true }; // 0 = unlimited
+  if (maxUsers === 0) return { allowed: true };
 
   const rows  = await query<any>('SELECT COUNT(*) AS cnt FROM users WHERE company_id = ?', [companyId]);
   const count = Number(rows[0]?.cnt ?? 0);
@@ -239,15 +251,16 @@ export async function createTrialSubscription(companyId: string): Promise<void> 
   const trialEnd = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
   const fmt      = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
 
+  // INSERT IGNORE: safe to call multiple times, skips if row already exists
   await execute(
-    `INSERT INTO subscriptions
+    `INSERT IGNORE INTO subscriptions
        (id, company_id, plan_id, status, trial_starts_at, trial_ends_at)
      VALUES (?, ?, 'plan_starter', 'trialing', ?, ?)`,
     [uuidv4(), companyId, fmt(now), fmt(trialEnd)]
   );
 }
 
-// ── Activate paid subscription after successful Paystack payment ───────────────
+// ── Activate paid subscription (UPSERT — safe even if no row exists) ──────────
 
 export async function activatePaidSubscription(
   companyId: string,
@@ -256,23 +269,128 @@ export async function activatePaidSubscription(
   paystackSubCode?: string
 ): Promise<void> {
   const { execute } = await import('@/lib/db');
+  const { v4: uuidv4 } = await import('uuid');
 
   const now       = new Date();
   const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const fmt       = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
 
   await execute(
-    `UPDATE subscriptions
-     SET  plan_id                = ?,
-          status                 = 'active',
-          current_period_start   = ?,
-          current_period_end     = ?,
-          paystack_customer_code = ?,
-          paystack_sub_code      = ?,
-          updated_at             = CURRENT_TIMESTAMP
-     WHERE company_id = ?`,
-    [planId, fmt(now), fmt(periodEnd), paystackCustomerCode ?? null, paystackSubCode ?? null, companyId]
+    `INSERT INTO subscriptions
+       (id, company_id, plan_id, status,
+        trial_starts_at, trial_ends_at,
+        current_period_start, current_period_end,
+        paystack_customer_code, paystack_sub_code)
+     VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       plan_id                = VALUES(plan_id),
+       status                 = 'active',
+       current_period_start   = VALUES(current_period_start),
+       current_period_end     = VALUES(current_period_end),
+       paystack_customer_code = VALUES(paystack_customer_code),
+       paystack_sub_code      = VALUES(paystack_sub_code),
+       updated_at             = CURRENT_TIMESTAMP`,
+    [
+      uuidv4(), companyId, planId,
+      fmt(now), fmt(now),
+      fmt(now), fmt(periodEnd),
+      paystackCustomerCode ?? null,
+      paystackSubCode ?? null,
+    ]
   );
+}
+
+// ── Extend / queue a paid subscription ────────────────────────────────────────
+// If sub is still active → queues the new plan to start after current end date.
+// If sub is expired or missing → activates immediately.
+// Same-plan re-purchase stacks on top, different plan queues as a future switch.
+
+export async function extendPaidSubscription(
+  companyId: string,
+  planId: string,
+  months: number,
+  paystackRef: string
+): Promise<void> {
+  const { execute } = await import('@/lib/db');
+  const { v4: uuidv4 } = await import('uuid');
+
+  const fmt = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
+
+  // Find the furthest future end date across active sub + any already-queued entries
+  const latestRow = await queryOne<any>(
+    `SELECT MAX(ends_at) AS latest_end
+     FROM (
+       SELECT current_period_end AS ends_at
+       FROM   subscriptions
+       WHERE  company_id = ? AND status = 'active'
+       UNION ALL
+       SELECT ends_at
+       FROM   subscription_queue
+       WHERE  company_id = ? AND status = 'pending'
+     ) t`,
+    [companyId, companyId]
+  );
+
+  const baseDate = latestRow?.latest_end ? new Date(latestRow.latest_end) : new Date();
+  const startsAt = new Date(baseDate);
+  const endsAt   = new Date(baseDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
+
+  const now = new Date();
+
+  // If base date is in the past the subscription has already expired — activate immediately
+  if (startsAt <= now) {
+    await activatePaidSubscription(companyId, planId);
+    // Extend the period end by the months purchased
+    await execute(
+      `UPDATE subscriptions
+       SET  plan_id            = ?,
+            current_period_end = ?,
+            updated_at         = CURRENT_TIMESTAMP
+       WHERE company_id = ?`,
+      [planId, fmt(endsAt), companyId]
+    );
+    return;
+  }
+
+  // Queue for the future
+  await execute(
+    `INSERT INTO subscription_queue
+       (id, company_id, plan_id, months, starts_at, ends_at, paystack_ref, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    [uuidv4(), companyId, planId, months, fmt(startsAt), fmt(endsAt), paystackRef]
+  );
+}
+
+// ── Get queued subscriptions for a company ────────────────────────────────────
+
+export async function getSubscriptionQueue(companyId: string): Promise<QueuedSubscription[]> {
+  const rows = await query<any>(
+    `SELECT q.*,
+            p.name        AS plan_name,
+            p.price       AS plan_price,
+            p.max_projects,
+            p.max_users,
+            p.features,
+            p.is_active
+     FROM   subscription_queue q
+     JOIN   plans p ON q.plan_id = p.id
+     WHERE  q.company_id = ?
+       AND  q.status IN ('pending', 'active')
+     ORDER  BY q.starts_at ASC`,
+    [companyId]
+  );
+
+  return rows.map((r: any) => ({
+    id:          r.id,
+    companyId:   r.company_id,
+    planId:      r.plan_id,
+    months:      r.months,
+    startsAt:    r.starts_at,
+    endsAt:      r.ends_at,
+    paystackRef: r.paystack_ref ?? null,
+    status:      r.status,
+    plan:        rowToPlan(r),
+  }));
 }
 
 // ── Fetch all active plans ────────────────────────────────────────────────────
