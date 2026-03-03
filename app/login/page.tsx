@@ -57,6 +57,11 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if user needs email verification
+        if (data.needsVerification) {
+          router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+          return;
+        }
         setError(data.error || 'Login failed');
         return;
       }
@@ -169,6 +174,12 @@ export default function LoginPage() {
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
+
+          <div className="mt-4 text-center">
+            <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-primary">
+              Forgot Password?
+            </Link>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">

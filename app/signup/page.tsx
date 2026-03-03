@@ -1,3 +1,4 @@
+// app/signup/page.tsx
 'use client';
 
 import React from "react"
@@ -54,8 +55,12 @@ export default function SignUpPage() {
         return;
       }
 
-      // Redirect to login page
-      router.push('/login?message=Account created successfully. Please log in.');
+      // Redirect to verification page
+      if (data.needsVerification) {
+        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+      } else {
+        router.push('/login?message=Account created successfully. Please log in.');
+      }
     } catch (err) {
       setError('An error occurred. Please try again.');
       console.error('[v0] Signup error:', err);

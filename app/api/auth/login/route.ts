@@ -1,3 +1,4 @@
+// app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import bcryptjs from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     // Find user
     const user = await queryOne<any>(
-      'SELECT id, name, email, password, role, company_id FROM users WHERE email = ?',
+      'SELECT id, name, email, password, role, company_id, email_verified FROM users WHERE email = ?',
       [email]
     );
 
@@ -38,6 +39,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
+      );
+    }
+
+    // Check if email is verified
+    if (!user.email_verified) {
+      return NextResponse.json(
+        { error: 'Please verify your email before logging in', needsVerification: true, email: user.email },
+        { status: 403 }
       );
     }
 

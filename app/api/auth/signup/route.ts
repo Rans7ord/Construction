@@ -5,6 +5,11 @@ import { query, queryOne } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from '@/lib/auth';
 import { createTrialSubscription, canAddUser } from '@/lib/subscription';
+import { sendOTPEmail } from '@/lib/email';
+
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,10 +78,30 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcryptjs.hash(password, 10);
     const userId = uuidv4();
 
+    // Create user with email_verified = 0 (false) by default
     await query(
-      'INSERT INTO users (id, name, email, password, role, company_id) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO users (id, name, email, password, role, company_id, email_verified) VALUES (?, ?, ?, ?, ?, ?, 0)',
       [userId, name, email, hashedPassword, role, companyId]
     );
+
+    // Generate and send OTP for email verification
+    const otp = generateOTP();
+    const otpHash = await bcryptjs.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store OTP
+    await query(
+      'INSERT INTO email_verifications (id, user_id, otp_hash, expires_at, attempts) VALUES (?, ?, ?, ?, 0)',
+      [uuidv4(), userId, otpHash, expiresAt]
+    );
+
+    // Send verification email
+    try {
+      await sendOTPEmail(email, otp);
+    } catch (emailError) {
+      console.error('[SIGNUP] Failed to send verification email:', emailError);
+      // Don't fail signup if email fails, just log it
+    }
 
     // ── Create 15-day trial for brand-new companies only ──────────────────────
     if (isNewCompany) {
@@ -90,7 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { message: 'User created successfully', userId },
+      { message: 'User created successfully. Please verify your email.', userId, needsVerification: true },
       { status: 201 }
     );
   } catch (error) {
