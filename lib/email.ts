@@ -40,7 +40,7 @@ export async function sendOTPEmail(email: string, otp: string) {
 export async function sendPasswordResetEmail(email: string, resetLink: string) {
   try {
     await transporter.sendMail({
-      from: `Workfield <${FROM_EMAIL}>`,
+      from: `Logonvoice <${FROM_EMAIL}>`,
       to: email,
       subject: 'Password Reset Request',
       html: `
