@@ -9,29 +9,24 @@ function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function toMySQLDateTime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email } = body;
 
-    // Validate input
     if (!email) {
-      return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
-    // Find user
     const user = await queryOne<any>(
       'SELECT id, email, email_verified FROM users WHERE email = ?',
       [email]
@@ -51,20 +46,17 @@ export async function POST(request: NextRequest) {
       [user.id]
     );
 
-    // Generate new OTP
     const otp = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = toMySQLDateTime(new Date(Date.now() + 10 * 60 * 1000));
 
-    // Store OTP
     await query(
       'INSERT INTO email_verifications (id, user_id, otp_hash, expires_at, attempts) VALUES (?, ?, ?, ?, 0)',
       [uuidv4(), user.id, otpHash, expiresAt]
     );
 
-    // Send OTP email
     const emailResult = await sendOTPEmail(email, otp);
-    
+
     if (!emailResult.success) {
       console.error('[RESEND-VERIFICATION] Failed to send email:', emailResult.error);
       return NextResponse.json(
@@ -80,9 +72,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[RESEND-VERIFICATION] Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to process request' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
 }
