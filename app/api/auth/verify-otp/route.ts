@@ -1,4 +1,4 @@
-// app/api/auth/reset-password/route.ts
+// app/api/auth/verify-otp/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { query, queryOne } from '@/lib/db';
