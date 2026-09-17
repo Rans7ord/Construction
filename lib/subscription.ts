@@ -397,7 +397,7 @@ export async function getSubscriptionQueue(companyId: string): Promise<QueuedSub
 
 export async function getPlans(): Promise<Plan[]> {
   const rows = await query<any>(
-    'SELECT * FROM plans WHERE is_active = 1 ORDER BY price ASC'
+    'SELECT * FROM plans WHERE is_active = TRUE ORDER BY price ASC'
   );
   return rows.map(rowToPlan);
 }
