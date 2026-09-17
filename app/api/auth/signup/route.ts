@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const userId = uuidv4();
 
     await query(
-      'INSERT INTO users (id, name, email, password, role, company_id, email_verified) VALUES (?, ?, ?, ?, ?, ?, 0)',
+      'INSERT INTO users (id, name, email, password, role, company_id, email_verified) VALUES (?, ?, ?, ?, ?, ?, FALSE)',
       [userId, name, email, hashedPassword, role, companyId]
     );
 
