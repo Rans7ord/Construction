@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       params.push(projectId);
     }
 
-    sql += ' ORDER BY ps.project_id, ps.`order`';
+    sql += ' ORDER BY ps.project_id, ps."order"';
 
     const steps = await query<any>(sql, params);
     
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     await execute(
       `INSERT INTO project_steps (
-        id, project_id, name, description, estimated_budget, status, \`order\`
+        id, project_id, name, description, estimated_budget, status, "order"
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         stepId,
