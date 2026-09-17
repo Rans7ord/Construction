@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   let plan: any;
   try {
     plan = await queryOne<any>(
-      'SELECT * FROM plans WHERE id = ? AND is_active = 1',
+      'SELECT * FROM plans WHERE id = ? AND is_active = TRUE',
       [planId]
     );
   } catch (e) {
