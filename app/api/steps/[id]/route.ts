@@ -75,7 +75,7 @@ export async function PUT(
     await execute(
       `UPDATE project_steps SET
         project_id = ?, name = ?, description = ?,
-        estimated_budget = ?, status = ?, \`order\` = ?
+        estimated_budget = ?, status = ?, "order" = ?
       WHERE id = ?`,
       [
         projectId || existingStep.project_id,
