@@ -14,16 +14,11 @@ import { Pool, type QueryResultRow } from 'pg';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Neon requires TLS. Their pooled connection strings already carry
-  // `?sslmode=require`, but setting this makes it explicit and survives
-  // someone pasting a direct connection string instead.
   ssl: { rejectUnauthorized: false },
   max: 10,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
 });
-
-// ── ? → $n placeholder conversion ────────────────────────────────────────────
 
 function toPgPlaceholders(sql: string): string {
   let out = '';
@@ -35,7 +30,6 @@ function toPgPlaceholders(sql: string): string {
 
     if (quote) {
       out += ch;
-      // Handle the doubled-quote escape ('' inside a string literal)
       if (ch === quote) {
         if (sql[i + 1] === quote) {
           out += sql[++i];
@@ -63,8 +57,6 @@ function toPgPlaceholders(sql: string): string {
   return out;
 }
 
-// ── Core helpers ─────────────────────────────────────────────────────────────
-
 export async function query<T extends QueryResultRow = any>(
   sql: string,
   params?: any[]
@@ -73,13 +65,6 @@ export async function query<T extends QueryResultRow = any>(
   return result.rows;
 }
 
-/**
- * Kept for compatibility with the mysql2 version. Note the shape difference:
- * mysql2 returned a ResultSetHeader with `affectedRows` / `insertId`.
- * pg returns `{ rowCount, rows }`. Your codebase never reads affectedRows or
- * insertId (I checked), so this is safe as-is — but if you add code that
- * needs the number of rows touched, use `.rowCount`.
- */
 export async function execute<T = any>(
   sql: string,
   params?: any[]
@@ -96,8 +81,6 @@ export async function queryOne<T extends QueryResultRow = any>(
   return results.length > 0 ? results[0] : null;
 }
 
-// ── Convenience wrappers (unchanged behaviour) ───────────────────────────────
-
 export async function getUserByEmail(email: string) {
   return queryOne(
     'SELECT id, name, email, role, company_id FROM users WHERE email = ?',
@@ -113,7 +96,6 @@ export async function verifyPassword(email: string, password: string) {
 
   if (!user) return null;
 
-  // Password comparison still happens in the auth middleware, same as before.
   return user;
 }
 
