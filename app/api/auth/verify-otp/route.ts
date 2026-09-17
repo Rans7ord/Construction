@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Update user email_verified status
     await query(
-      'UPDATE users SET email_verified = 1, email_verified_at = NOW() WHERE id = ?',
+      'UPDATE users SET email_verified = TRUE, email_verified_at = NOW() WHERE id = ?',
       [user.id]
     );
 
