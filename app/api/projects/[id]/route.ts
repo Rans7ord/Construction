@@ -55,7 +55,7 @@ export async function GET(
 
     // Get steps
     const steps = await query<any>(
-      'SELECT * FROM project_steps WHERE project_id = ? ORDER BY `order`',
+      'SELECT * FROM project_steps WHERE project_id = ? ORDER BY "order"',
       [id]
     );
 
