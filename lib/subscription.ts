@@ -252,13 +252,14 @@ export async function createTrialSubscription(companyId: string): Promise<void> 
   const fmt      = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
 
   // ON CONFLICT DO NOTHING: safe to call multiple times, skips if row already exists
-await execute(
-  `INSERT INTO subscriptions
-     (id, company_id, plan_id, status, trial_starts_at, trial_ends_at)
-   VALUES (?, ?, 'plan_starter', 'trialing', ?, ?)
-   ON CONFLICT (company_id) DO NOTHING`,
-  [uuidv4(), companyId, fmt(now), fmt(trialEnd)]
-);
+  await execute(
+    `INSERT INTO subscriptions
+       (id, company_id, plan_id, status, trial_starts_at, trial_ends_at)
+     VALUES (?, ?, 'plan_starter', 'trialing', ?, ?)
+     ON CONFLICT (company_id) DO NOTHING`,
+    [uuidv4(), companyId, fmt(now), fmt(trialEnd)]
+  );
+}
 
 // ── Activate paid subscription (UPSERT — safe even if no row exists) ──────────
 
@@ -276,28 +277,28 @@ export async function activatePaidSubscription(
   const fmt       = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
 
   await execute(
-  `INSERT INTO subscriptions
-     (id, company_id, plan_id, status,
-      trial_starts_at, trial_ends_at,
-      current_period_start, current_period_end,
-      paystack_customer_code, paystack_sub_code)
-   VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
-   ON CONFLICT (company_id) DO UPDATE SET
-     plan_id                = EXCLUDED.plan_id,
-     status                 = 'active',
-     current_period_start   = EXCLUDED.current_period_start,
-     current_period_end     = EXCLUDED.current_period_end,
-     paystack_customer_code = EXCLUDED.paystack_customer_code,
-     paystack_sub_code      = EXCLUDED.paystack_sub_code,
-     updated_at             = CURRENT_TIMESTAMP`,
-  [
-    uuidv4(), companyId, planId,
-    fmt(now), fmt(now),
-    fmt(now), fmt(periodEnd),
-    paystackCustomerCode ?? null,
-    paystackSubCode ?? null,
-  ]
-);
+    `INSERT INTO subscriptions
+       (id, company_id, plan_id, status,
+        trial_starts_at, trial_ends_at,
+        current_period_start, current_period_end,
+        paystack_customer_code, paystack_sub_code)
+     VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (company_id) DO UPDATE SET
+       plan_id                = EXCLUDED.plan_id,
+       status                 = 'active',
+       current_period_start   = EXCLUDED.current_period_start,
+       current_period_end     = EXCLUDED.current_period_end,
+       paystack_customer_code = EXCLUDED.paystack_customer_code,
+       paystack_sub_code      = EXCLUDED.paystack_sub_code,
+       updated_at             = CURRENT_TIMESTAMP`,
+    [
+      uuidv4(), companyId, planId,
+      fmt(now), fmt(now),
+      fmt(now), fmt(periodEnd),
+      paystackCustomerCode ?? null,
+      paystackSubCode ?? null,
+    ]
+  );
 }
 
 // ── Extend / queue a paid subscription ────────────────────────────────────────
